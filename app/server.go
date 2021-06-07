@@ -33,19 +33,6 @@ type response struct {
 	Data []byte `json:"txHash"`
 }
 
-func main() {
-	configPath := "./config"
-	var client internal.Client
-	// initialize our client plugin
-	err := client.Initialize(configPath)
-	if err != nil {
-		return
-	}
-	g, _ := NewServer(&client)
-	g.Start()
-
-}
-
 func NewServer(client *internal.Client) (*Server, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	gin.SetMode(gin.ReleaseMode)

@@ -158,7 +158,7 @@ func (c *Client) Initialize(configPath string) error {
 	c.bxhAuth = authBxh
 	c.bxhPrivateKey = unlockedKeyBxh.PrivateKey
 	// 初始化leveldb
-	leveldb, err := leveldb.New("./build")
+	leveldb, err := leveldb.New(filepath.Join(c.Config.RepoRoot, "store"))
 	if err != nil {
 		return fmt.Errorf("create tm-leveldb: %w", err)
 	}

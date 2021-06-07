@@ -2,6 +2,7 @@ package internal
 
 import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common/math"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -29,11 +30,11 @@ func sendTraEthToken(c *Client, toAddr string, amount int64) (string, error) {
 		From:   c.ethAuth.From,
 		Signer: c.ethAuth.Signer,
 		Value:  nil,
-	}, common.HexToAddress(toAddr), big.NewInt(amount))
+	}, common.HexToAddress(toAddr), big.NewInt(amount*math.BigPow(10, 18).Int64()))
 	if err != nil {
 		c.logger.Fatalf("TransferFrom err: %v \n", err)
 		return "", err
 	}
-	c.logger.Infof("tx sent: %s \n", tx.Hash().Hex())
+	c.logger.Infof("erc20 tx sent: %s \n", tx.Hash().Hex())
 	return tx.Hash().Hex(), nil
 }

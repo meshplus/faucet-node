@@ -2,6 +2,7 @@ package internal
 
 import (
 	"context"
+	"github.com/ethereum/go-ethereum/common/math"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -13,6 +14,14 @@ func sendTxBxh(c *Client, toAddr string, amount int64) (string, error) {
 	defer c.bxhLock.Unlock()
 	client := c.bxhClient
 
+	////余额查询
+	//accountBalance, err := contract.BalanceOf(nil, common.HexToAddress("0xFDc7b0d2C02c91cB2916494076a87255051F558d"))
+	//if err != nil {
+	//	c.logger.Fatalf("get Balances err: %v \n", err)
+	//	return "", err
+	//}
+	//c.logger.Infof("tx sent: %s \n", tx.Hash().Hex())
+
 	fromAddress := c.bxhAuth.From
 	nonce, err := client.PendingNonceAt(context.Background(), fromAddress)
 	if err != nil {
@@ -20,8 +29,8 @@ func sendTxBxh(c *Client, toAddr string, amount int64) (string, error) {
 		return "", err
 	}
 
-	value := big.NewInt(1000000000000000000 * amount) // in wei (1 eth)
-	gasLimit := uint64(21000)                         // in units
+	value := big.NewInt(math.BigPow(10, 18).Int64() * amount) // in wei (1 eth)
+	gasLimit := uint64(21000)                                 // in units
 	gasPrice, err := client.SuggestGasPrice(context.Background())
 	if err != nil {
 		c.logger.Error(err)
@@ -49,6 +58,6 @@ func sendTxBxh(c *Client, toAddr string, amount int64) (string, error) {
 		c.logger.Error(err)
 		return "", err
 	}
-	c.logger.Infof("tx sent: %s", signedTx.Hash().Hex())
+	c.logger.Infof("bxh tx sent: %s", signedTx.Hash().Hex())
 	return signedTx.Hash().Hex(), nil
 }

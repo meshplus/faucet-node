@@ -11,10 +11,11 @@ const (
 )
 
 type Config struct {
-	Ether   Ether   `toml:"ether" json:"ether"`
-	Bxh     Bxh     `toml:"bxh" json:"bxh"`
-	Network Network `toml:"network" json:"network"`
-	Log     Log     `toml:"log" json:"log"`
+	RepoRoot string
+	Ether    Ether   `toml:"ether" json:"ether"`
+	Bxh      Bxh     `toml:"bxh" json:"bxh"`
+	Network  Network `toml:"network" json:"network"`
+	Log      Log     `toml:"log" json:"log"`
 }
 
 // Log are config about log
@@ -68,6 +69,7 @@ func UnmarshalConfig(configRoot string) (*Config, error) {
 	if err := viper.Unmarshal(config); err != nil {
 		return nil, err
 	}
+	config.RepoRoot = configRoot
 
 	return config, nil
 }
