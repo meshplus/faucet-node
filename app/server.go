@@ -5,9 +5,10 @@ import (
 	"faucet/internal"
 	"faucet/internal/loggers"
 	"fmt"
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
-	"net/http"
 )
 
 //2. api：input： net，contractAddress，address； output：0，hash
@@ -64,12 +65,6 @@ func (g *Server) Start() error {
 	return nil
 }
 
-//func (g *Server) Stop() error {
-//	g.cancel()
-//	g.logger.Infoln("gin service stop")
-//	return nil
-//}
-
 func (g *Server) come(c *gin.Context) {
 	res := &response{}
 	var comeInput ComeInput
@@ -78,6 +73,7 @@ func (g *Server) come(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, res)
 		return
 	}
+	g.client.GinContext = c
 	data, err := g.client.SendTra(comeInput.Net, comeInput.Address)
 	if err != nil {
 		res.Msg = []byte(err.Error())

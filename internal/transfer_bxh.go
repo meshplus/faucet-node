@@ -2,8 +2,9 @@ package internal
 
 import (
 	"context"
-	"github.com/ethereum/go-ethereum/common/math"
 	"math/big"
+
+	"github.com/ethereum/go-ethereum/common/math"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -36,7 +37,6 @@ func sendTxBxh(c *Client, toAddr string, amount int64) (string, error) {
 		c.logger.Error(err)
 		return "", err
 	}
-
 	toAddress := common.HexToAddress(toAddr)
 	var data []byte
 	tx := types.NewTransaction(nonce, toAddress, value, gasLimit, gasPrice, data)

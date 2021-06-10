@@ -7,19 +7,23 @@ import (
 	"encoding/json"
 	"faucet/internal/loggers"
 	"faucet/internal/repo"
+	"faucet/internal/utils"
 	"faucet/persist"
 	"fmt"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/accounts/keystore"
-	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/meshplus/bitxhub-kit/storage"
-	"github.com/meshplus/bitxhub-kit/storage/leveldb"
-	"github.com/sirupsen/logrus"
 	"io/ioutil"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/accounts/keystore"
+	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/gin-gonic/gin"
+	"github.com/meshplus/bitxhub-kit/storage"
+	"github.com/meshplus/bitxhub-kit/storage/leveldb"
+	"github.com/meshplus/bitxhub-kit/types"
+	"github.com/sirupsen/logrus"
 )
 
 type Client struct {
@@ -34,6 +38,7 @@ type Client struct {
 	bxhPrivateKey *ecdsa.PrivateKey
 	ldb           storage.Storage
 	logger        logrus.FieldLogger
+	GinContext    *gin.Context
 }
 
 type AddressData struct {
@@ -43,15 +48,15 @@ type AddressData struct {
 }
 
 func (c *Client) SendTra(net string, address string) (string, error) {
-	// 合法校验：每天每个addr只发一个
-	if !isValid(net, address, c.ldb) {
-		return "", fmt.Errorf("surpass the faucet limit: %s", "1day1amount")
+	// 合法校验：每天每个(public_ip + ip + addr)只发一个
+	if err := c.isValid(net, address, c.ldb); err != nil {
+		return "", err
 	}
 	switch net {
 	case "bxh":
 		txHash, err := sendTxBxh(c, address, 1)
 		if err != nil {
-			c.ldb.Delete(construKey(persist.BxhAddressKey, address))
+			c.ldb.Delete(c.construKey(persist.BxhAddressKey, address))
 			return "", fmt.Errorf("txFailed: %w", err)
 		}
 		if err := putTxData(txHash, c, address, persist.BxhAddressKey); err != nil {
@@ -61,7 +66,7 @@ func (c *Client) SendTra(net string, address string) (string, error) {
 	case "erc20":
 		txHash, err := sendTraEthToken(c, address, 1)
 		if err != nil {
-			c.ldb.Delete(construKey(persist.Erc20AddressKey, address))
+			c.ldb.Delete(c.construKey(persist.Erc20AddressKey, address))
 			return "", fmt.Errorf("txFailed: %w", err)
 		}
 		if err := putTxData(txHash, c, address, persist.Erc20AddressKey); err != nil {
@@ -83,44 +88,54 @@ func putTxData(txHash string, c *Client, address string, net string) error {
 	if err != nil {
 		return fmt.Errorf("json marshal failed: %w", err)
 	}
-	c.ldb.Put(construKey(net, address), structJSON)
+	c.ldb.Put(c.construKey(net, address), structJSON)
 	return nil
 }
 
-func isValid(net string, address string, ldb storage.Storage) bool {
+func (c *Client) isValid(net string, address string, ldb storage.Storage) error {
+	// address格式校验
+	if add := types.NewAddressByStr(address); add == nil {
+		return fmt.Errorf("invalid address: %s", address)
+	}
 	// 合法校验：每天每个addr只发一个
 	switch net {
 	case "bxh":
-		return checkLimit(address, ldb, persist.BxhAddressKey)
+		return c.checkLimit(address, ldb, persist.BxhAddressKey)
 	case "erc20":
-		return checkLimit(address, ldb, persist.Erc20AddressKey)
+		return c.checkLimit(address, ldb, persist.Erc20AddressKey)
 	default:
-		return false
+		return fmt.Errorf("invalid net: %s", net)
 	}
 }
 
-func construKey(pre string, address string) []byte {
+func (c *Client) construKey(net string, address string) []byte {
+	// get public_ip and ip with address and net tobe key
 	var buffer bytes.Buffer
 	buffer.WriteString(time.Now().Format("2006-01-02"))
 	buffer.WriteString("-")
+	buffer.WriteString(utils.ClientPublicIP(c.GinContext.Request))
+	buffer.WriteString("-")
+	buffer.WriteString(utils.ClientIp(c.GinContext.Request))
+	buffer.WriteString("-")
 	buffer.WriteString(address)
-	return persist.CompositeKey(pre, buffer)
+	c.logger.Infof("construKey: %s ", buffer)
+	return persist.CompositeKey(net, buffer)
 }
 
-func checkLimit(address string, ldb storage.Storage, pre string) bool {
-	data := ldb.Get(construKey(pre, address))
+func (c *Client) checkLimit(address string, ldb storage.Storage, net string) error {
+	data := ldb.Get(c.construKey(net, address))
 	if data != nil {
 		//p := &AddressData{}
 		//err := json.Unmarshal([]byte(data), &p)
 		//if err != nil || len(p.TxHash) == 0 {
 		//	return true
 		//}
-		return false
+		return fmt.Errorf("surpass the faucet limit: %s", "1day1amount")
 	} else {
 		// 占位
-		ldb.Put(construKey(pre, address), []byte("1"))
+		ldb.Put(c.construKey(net, address), []byte("1"))
 	}
-	return true
+	return nil
 }
 
 func (c *Client) Initialize(configPath string) error {

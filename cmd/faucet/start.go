@@ -68,7 +68,6 @@ func start(ctx *cli.Context) error {
 	if err := server.Start(); err != nil {
 		return err
 	}
-
 	wg.Wait()
 
 	logger.Info("faucet exits")
