@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 )
@@ -48,7 +49,7 @@ func NewServer(client *internal.Client) (*Server, error) {
 }
 
 func (g *Server) Start() error {
-	g.router.Use(gin.Recovery())
+	g.router.Use(gin.Recovery()).Use(cors.Default())
 	v1 := g.router.Group("/v1")
 	{
 		v1.POST("come", g.come)

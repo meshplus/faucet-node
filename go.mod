@@ -6,6 +6,7 @@ require (
 	github.com/ethereum/go-ethereum v1.10.3
 	github.com/fatih/color v1.7.0
 	github.com/fsnotify/fsnotify v1.4.9
+	github.com/gin-contrib/cors v1.3.1
 	github.com/gin-gonic/gin v1.7.2
 	github.com/gobuffalo/packd v1.0.0
 	github.com/gobuffalo/packr v1.30.1
