@@ -48,34 +48,31 @@ type AddressData struct {
 }
 
 func (c *Client) SendTra(net string, address string) (string, error) {
+	var (
+		txHash string
+		err    error
+	)
+
 	// 合法校验：每天每个(public_ip + ip + addr)只发一个
 	if err := c.isValid(net, address, c.ldb); err != nil {
 		return "", err
 	}
 	switch net {
 	case "bxh":
-		txHash, err := sendTxBxh(c, address, 1)
-		if err != nil {
-			c.ldb.Delete(c.construKey(persist.BxhAddressKey, address))
-			return "", fmt.Errorf("txFailed: %w", err)
-		}
-		if err := putTxData(txHash, c, address, persist.BxhAddressKey); err != nil {
-			return "", fmt.Errorf("putTxDataFailed: %w", err)
-		}
-		return txHash, nil
+		txHash, err = sendTxBxh(c, address, 1)
 	case "erc20":
-		txHash, err := sendTraEthToken(c, address, 1)
-		if err != nil {
-			c.ldb.Delete(c.construKey(persist.Erc20AddressKey, address))
-			return "", fmt.Errorf("txFailed: %w", err)
-		}
-		if err := putTxData(txHash, c, address, persist.Erc20AddressKey); err != nil {
-			return "", fmt.Errorf("putTxDataFailed: %w", err)
-		}
-		return txHash, nil
+		txHash, err = sendTraEthToken(c, address, 1)
 	default:
 		return "", fmt.Errorf("invalid net: %s", net)
 	}
+	if err != nil {
+		deleteTxData(c, address, net)
+		return "", fmt.Errorf("txFailed: %w", err)
+	}
+	if err := putTxData(txHash, c, address, net); err != nil {
+		return "", fmt.Errorf("putTxDataFailed: %w", err)
+	}
+	return txHash, nil
 }
 
 func putTxData(txHash string, c *Client, address string, net string) error {
@@ -88,7 +85,14 @@ func putTxData(txHash string, c *Client, address string, net string) error {
 	if err != nil {
 		return fmt.Errorf("json marshal failed: %w", err)
 	}
-	c.ldb.Put(c.construKey(net, address), structJSON)
+	c.ldb.Put(c.construAddressKey(net, address), structJSON)
+	c.ldb.Put(c.construIpKey(net), structJSON)
+	return nil
+}
+
+func deleteTxData(c *Client, address string, net string) error {
+	c.ldb.Delete(c.construAddressKey(net, address))
+	c.ldb.Delete(c.construIpKey(net))
 	return nil
 }
 
@@ -98,17 +102,21 @@ func (c *Client) isValid(net string, address string, ldb storage.Storage) error 
 		return fmt.Errorf("invalid address: %s", address)
 	}
 	// 合法校验：每天每个addr只发一个
-	switch net {
-	case "bxh":
-		return c.checkLimit(address, ldb, persist.BxhAddressKey)
-	case "erc20":
-		return c.checkLimit(address, ldb, persist.Erc20AddressKey)
-	default:
-		return fmt.Errorf("invalid net: %s", net)
-	}
+	return c.checkLimit(address, ldb, net)
+
 }
 
-func (c *Client) construKey(net string, address string) []byte {
+func (c *Client) construAddressKey(net string, address string) []byte {
+	// get public_ip and ip with address and net tobe key
+	var buffer bytes.Buffer
+	buffer.WriteString(time.Now().Format("2006-01-02"))
+	buffer.WriteString("-")
+	buffer.WriteString(address)
+	c.logger.Infof("construKey: %s ", buffer)
+	return persist.CompositeKey(net, buffer)
+}
+
+func (c *Client) construIpKey(net string) []byte {
 	// get public_ip and ip with address and net tobe key
 	var buffer bytes.Buffer
 	buffer.WriteString(time.Now().Format("2006-01-02"))
@@ -116,15 +124,14 @@ func (c *Client) construKey(net string, address string) []byte {
 	buffer.WriteString(utils.ClientPublicIP(c.GinContext.Request))
 	buffer.WriteString("-")
 	buffer.WriteString(utils.ClientIp(c.GinContext.Request))
-	buffer.WriteString("-")
-	buffer.WriteString(address)
 	c.logger.Infof("construKey: %s ", buffer)
 	return persist.CompositeKey(net, buffer)
 }
 
 func (c *Client) checkLimit(address string, ldb storage.Storage, net string) error {
-	data := ldb.Get(c.construKey(net, address))
-	if data != nil {
+	data := ldb.Get(c.construAddressKey(net, address))
+	data2 := ldb.Get(c.construIpKey(net))
+	if data != nil || data2 != nil {
 		//p := &AddressData{}
 		//err := json.Unmarshal([]byte(data), &p)
 		//if err != nil || len(p.TxHash) == 0 {
@@ -133,7 +140,8 @@ func (c *Client) checkLimit(address string, ldb storage.Storage, net string) err
 		return fmt.Errorf("surpass the faucet limit: %s", "1day1amount")
 	} else {
 		// 占位
-		ldb.Put(c.construKey(net, address), []byte("1"))
+		ldb.Put(c.construAddressKey(net, address), []byte("1"))
+		ldb.Put(c.construIpKey(net), []byte("1"))
 	}
 	return nil
 }

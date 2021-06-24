@@ -4,6 +4,7 @@ import (
 	"context"
 	"faucet/internal"
 	"faucet/internal/loggers"
+	"faucet/internal/utils"
 	"fmt"
 	"net/http"
 
@@ -31,8 +32,8 @@ type ComeInput struct {
 }
 
 type response struct {
-	Msg  []byte `json:"msg"`
-	Data []byte `json:"txHash"`
+	Msg  string `json:"msg"`
+	Data string `json:"txHash"`
 }
 
 func NewServer(client *internal.Client) (*Server, error) {
@@ -49,7 +50,7 @@ func NewServer(client *internal.Client) (*Server, error) {
 }
 
 func (g *Server) Start() error {
-	g.router.Use(gin.Recovery()).Use(cors.Default())
+	g.router.Use(gin.Recovery()).Use(cors.Default()).Use(g.MaxAllowed(200))
 	v1 := g.router.Group("/v1")
 	{
 		v1.POST("come", g.come)
@@ -70,19 +71,19 @@ func (g *Server) come(c *gin.Context) {
 	res := &response{}
 	var comeInput ComeInput
 	if err := c.BindJSON(&comeInput); err != nil {
-		res.Msg = []byte(err.Error())
+		res.Msg = err.Error()
 		c.JSON(http.StatusBadRequest, res)
 		return
 	}
 	g.client.GinContext = c
 	data, err := g.client.SendTra(comeInput.Net, comeInput.Address)
 	if err != nil {
-		res.Msg = []byte(err.Error())
+		res.Msg = err.Error()
 		c.JSON(http.StatusInternalServerError, res)
 		return
 	}
-	res.Msg = []byte("ok")
-	res.Data = []byte(data)
+	res.Msg = "ok"
+	res.Data = data
 	c.PureJSON(http.StatusOK, res)
 }
 
@@ -91,4 +92,18 @@ func (g *Server) Stop() error {
 	g.cancel()
 	g.logger.Infoln("gin service stop")
 	return nil
+}
+
+//MaxAllowed 限流器
+func (g *Server) MaxAllowed(limitValue int64) func(c *gin.Context) {
+	limiter := utils.NewLimiter(limitValue)
+	g.logger.Infof("limiter.SetMax: %d", limitValue)
+	// 返回限流逻辑
+	return func(c *gin.Context) {
+		if !limiter.Ok() {
+			c.AbortWithStatus(http.StatusServiceUnavailable) //超过每秒200，就返回503错误码
+			return
+		}
+		c.Next()
+	}
 }
