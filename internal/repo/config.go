@@ -1,9 +1,10 @@
 package repo
 
 import (
-	"github.com/spf13/viper"
 	"path/filepath"
 	"strings"
+
+	"github.com/spf13/viper"
 )
 
 const (
@@ -13,6 +14,7 @@ const (
 type Config struct {
 	RepoRoot string
 	Ether    Ether   `toml:"ether" json:"ether"`
+	Bsc      Bsc     `toml:"bsc" json:"bsc"`
 	Bxh      Bxh     `toml:"bxh" json:"bxh"`
 	Network  Network `toml:"network" json:"network"`
 	Log      Log     `toml:"log" json:"log"`
@@ -31,12 +33,18 @@ type LogModule struct {
 }
 
 type Ether struct {
-	Addr            string `toml:"addr" json:"addr"`
-	Name            string `toml:"name" json:"name"`
-	ContractAddress string `mapstructure:"contract_address" json:"contract_address"`
-	KeyPath         string `mapstructure:"key_path" json:"key_path"`
-	Password        string `toml:"password" json:"password"`
-	MinConfirm      uint64 `mapstructure:"min_confirm" json:"min_confirm"`
+	Addr       string `toml:"addr" json:"addr"`
+	Name       string `toml:"name" json:"name"`
+	KeyPath    string `mapstructure:"key_path" json:"key_path"`
+	Password   string `toml:"password" json:"password"`
+	MinConfirm uint64 `mapstructure:"min_confirm" json:"min_confirm"`
+}
+type Bsc struct {
+	Addr       string `toml:"addr" json:"addr"`
+	Name       string `toml:"name" json:"name"`
+	KeyPath    string `mapstructure:"key_path" json:"key_path"`
+	Password   string `toml:"password" json:"password"`
+	MinConfirm uint64 `mapstructure:"min_confirm" json:"min_confirm"`
 }
 type Bxh struct {
 	BxhAddr     string `mapstructure:"bxh_addr" json:"bxh_addr"`

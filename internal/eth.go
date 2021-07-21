@@ -31,9 +31,12 @@ type Client struct {
 	ctx           context.Context
 	ethClient     *ethclient.Client
 	ethLock       sync.Mutex
+	bscClient     *ethclient.Client
+	bscLock       sync.Mutex
 	bxhClient     *ethclient.Client
 	bxhLock       sync.Mutex
 	ethAuth       *bind.TransactOpts
+	bscAuth       *bind.TransactOpts
 	bxhAuth       *bind.TransactOpts
 	bxhPrivateKey *ecdsa.PrivateKey
 	ldb           storage.Storage
@@ -47,29 +50,32 @@ type AddressData struct {
 	Amount     int64  `json:"amount"`
 }
 
-func (c *Client) SendTra(net string, address string) (string, error) {
+func (c *Client) SendTra(net string, address string, erc20Addr string) (string, error) {
 	var (
 		txHash string
 		err    error
 	)
 
 	// 合法校验：每天每个(public_ip + ip + addr)只发一个
-	if err := c.isValid(net, address, c.ldb); err != nil {
+	if err := c.isValid(net, address, c.ldb, erc20Addr); err != nil {
 		return "", err
 	}
 	switch net {
 	case "bxh":
 		txHash, err = sendTxBxh(c, address, 1)
 	case "erc20":
-		txHash, err = sendTraEthToken(c, address, 1)
+		txHash, err = sendTraEthToken(c, address, erc20Addr, 1)
+	case "bsc":
+		txHash, err = sendTraBscToken(c, address, erc20Addr, 1)
 	default:
 		return "", fmt.Errorf("invalid net: %s", net)
 	}
+	keyAddr := address + erc20Addr
 	if err != nil {
-		deleteTxData(c, address, net)
+		deleteTxData(c, keyAddr, net)
 		return "", fmt.Errorf("txFailed: %w", err)
 	}
-	if err := putTxData(txHash, c, address, net); err != nil {
+	if err := putTxData(txHash, c, keyAddr, net); err != nil {
 		return "", fmt.Errorf("putTxDataFailed: %w", err)
 	}
 	return txHash, nil
@@ -86,23 +92,25 @@ func putTxData(txHash string, c *Client, address string, net string) error {
 		return fmt.Errorf("json marshal failed: %w", err)
 	}
 	c.ldb.Put(c.construAddressKey(net, address), structJSON)
-	c.ldb.Put(c.construIpKey(net), structJSON)
 	return nil
 }
 
 func deleteTxData(c *Client, address string, net string) error {
 	c.ldb.Delete(c.construAddressKey(net, address))
-	c.ldb.Delete(c.construIpKey(net))
 	return nil
 }
 
-func (c *Client) isValid(net string, address string, ldb storage.Storage) error {
-	// address格式校验
+func (c *Client) isValid(net string, address string, ldb storage.Storage, erc20Addr string) error {
+	// address格式校验xx
 	if add := types.NewAddressByStr(address); add == nil {
 		return fmt.Errorf("invalid address: %s", address)
 	}
+	if !strings.EqualFold("bxh", net) && types.NewAddressByStr(erc20Addr) == nil {
+		return fmt.Errorf("invalid erc20Addr: %s", erc20Addr)
+	}
 	// 合法校验：每天每个addr只发一个
-	return c.checkLimit(address, ldb, net)
+	keyAddr := address + erc20Addr
+	return c.checkLimit(keyAddr, ldb, net)
 
 }
 
@@ -130,8 +138,7 @@ func (c *Client) construIpKey(net string) []byte {
 
 func (c *Client) checkLimit(address string, ldb storage.Storage, net string) error {
 	data := ldb.Get(c.construAddressKey(net, address))
-	data2 := ldb.Get(c.construIpKey(net))
-	if data != nil || data2 != nil {
+	if data != nil {
 		//p := &AddressData{}
 		//err := json.Unmarshal([]byte(data), &p)
 		//if err != nil || len(p.TxHash) == 0 {
@@ -141,23 +148,28 @@ func (c *Client) checkLimit(address string, ldb storage.Storage, net string) err
 	} else {
 		// 占位
 		ldb.Put(c.construAddressKey(net, address), []byte("1"))
-		ldb.Put(c.construIpKey(net), []byte("1"))
 	}
 	return nil
 }
 
 func (c *Client) Initialize(configPath string) error {
+	c.ctx = context.Background()
 	cfg, err := repo.UnmarshalConfig(configPath)
 	if err != nil {
 		return fmt.Errorf("unmarshal config for plugin :%w", err)
 	}
 	c.Config = cfg
-	// 构建eth+bxh客户端
+	// 构建eth+bxh+bsc客户端
 	etherCli, err := ethclient.Dial(cfg.Ether.Addr)
 	if err != nil {
 		return fmt.Errorf("dial ethereum node: %w", err)
 	}
 	c.ethClient = etherCli
+	etherCliBSc, err := ethclient.Dial(cfg.Bsc.Addr)
+	if err != nil {
+		return fmt.Errorf("dial bsc node: %w", err)
+	}
+	c.bscClient = etherCliBSc
 	bxhClient, err := ethclient.Dial(cfg.Bxh.BxhAddr)
 	if err != nil {
 		return fmt.Errorf("dial bxh node: %w", err)
@@ -169,8 +181,19 @@ func (c *Client) Initialize(configPath string) error {
 	psdPath := filepath.Join(configPath, cfg.Ether.Password)
 	password, err := ioutil.ReadFile(psdPath)
 	unlockedKey, err := keystore.DecryptKey(keyByte, strings.TrimSpace(string(password)))
-	auth := bind.NewKeyedTransactor(unlockedKey.PrivateKey)
+	chainID, err := etherCli.ChainID(c.ctx)
+	auth, err := bind.NewKeyedTransactorWithChainID(unlockedKey.PrivateKey, chainID)
+	auth.Context = c.ctx
 	c.ethAuth = auth
+	// 构建auth_bsc
+	chainIDBsc, err := etherCliBSc.ChainID(c.ctx)
+	authBsc, err := bind.NewKeyedTransactorWithChainID(unlockedKey.PrivateKey, chainIDBsc)
+	authBsc.Context = c.ctx
+	authBsc.GasFeeCap = nil
+	authBsc.GasTipCap = nil
+	authBsc.GasPrice, _ = c.bscClient.SuggestGasPrice(c.ctx)
+	c.bscAuth = authBsc
+
 	// 构建auth_bxh
 	keyPathBxh := filepath.Join(configPath, cfg.Bxh.BxhKeyPath)
 	keyByteBxh, err := ioutil.ReadFile(keyPathBxh)

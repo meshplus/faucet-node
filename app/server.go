@@ -27,8 +27,9 @@ type Server struct {
 }
 
 type ComeInput struct {
-	Net     string `json:"net"`
-	Address string `json:"address"`
+	Net       string `json:"net"`
+	Address   string `json:"address"`
+	Erc20Addr string `json:"erc20_addr"`
 }
 
 type response struct {
@@ -76,7 +77,7 @@ func (g *Server) come(c *gin.Context) {
 		return
 	}
 	g.client.GinContext = c
-	data, err := g.client.SendTra(comeInput.Net, comeInput.Address)
+	data, err := g.client.SendTra(comeInput.Net, comeInput.Address, comeInput.Erc20Addr)
 	if err != nil {
 		res.Msg = err.Error()
 		c.JSON(http.StatusInternalServerError, res)

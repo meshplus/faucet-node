@@ -3,15 +3,16 @@ package internal
 import (
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
+
+	"github.com/ethereum/go-ethereum/common"
 )
 
-func sendTraEthToken(c *Client, toAddr string, erc20Addr string, amount int64) (string, error) {
-	c.ethLock.Lock()
-	defer c.ethLock.Unlock()
+func sendTraBscToken(c *Client, toAddr string, erc20Addr string, amount int64) (string, error) {
+	c.bscLock.Lock()
+	defer c.bscLock.Unlock()
 	//使用合约地址
-	contract, err := NewERC20(common.HexToAddress(erc20Addr), c.ethClient)
+	contract, err := NewERC20(common.HexToAddress(erc20Addr), c.bscClient)
 	if err != nil {
 		c.logger.Fatalf("conn contract: %v \n", err)
 		return "", err
@@ -25,11 +26,11 @@ func sendTraEthToken(c *Client, toAddr string, erc20Addr string, amount int64) (
 	//c.logger.Infof("tx sent: %s \n", tx.Hash().Hex())
 
 	//转账
-	tx, err := contract.Transfer(c.ethAuth, common.HexToAddress(toAddr), big.NewInt(amount*math.BigPow(10, 18).Int64()))
+	tx, err := contract.Transfer(c.bscAuth, common.HexToAddress(toAddr), big.NewInt(amount*math.BigPow(10, 18).Int64()))
 	if err != nil {
-		c.logger.Errorf("Eth TransferFrom err: %v \n", err)
+		c.logger.Errorf("Bsc TransferFrom err: %v \n", err)
 		return "", err
 	}
-	c.logger.Infof("erc20 tx sent: %s \n", tx.Hash().Hex())
+	c.logger.Infof("bsc-erc20 tx sent: %s \n", tx.Hash().Hex())
 	return tx.Hash().Hex(), nil
 }

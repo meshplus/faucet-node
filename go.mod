@@ -3,7 +3,7 @@ module faucet
 go 1.16
 
 require (
-	github.com/ethereum/go-ethereum v1.10.3
+	github.com/ethereum/go-ethereum v1.10.4
 	github.com/fatih/color v1.7.0
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/gin-contrib/cors v1.3.1
