@@ -11,6 +11,7 @@ import (
 	"faucet/persist"
 	"fmt"
 	"io/ioutil"
+	"math/big"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -184,6 +185,8 @@ func (c *Client) Initialize(configPath string) error {
 	chainID, err := etherCli.ChainID(c.ctx)
 	auth, err := bind.NewKeyedTransactorWithChainID(unlockedKey.PrivateKey, chainID)
 	auth.Context = c.ctx
+	auth.GasLimit = 100000
+	auth.GasPrice = big.NewInt(50000)
 	c.ethAuth = auth
 	// 构建auth_bsc
 	chainIDBsc, err := etherCliBSc.ChainID(c.ctx)
