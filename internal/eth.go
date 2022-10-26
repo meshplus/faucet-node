@@ -58,9 +58,9 @@ func (c *Client) SendTra(net string, address string, erc20Addr string) (string, 
 	)
 
 	// 合法校验：每天每个(public_ip + ip + addr)只发一个
-	if err := c.isValid(net, address, c.ldb, erc20Addr); err != nil {
+	/*if err := c.isValid(net, address, c.ldb, erc20Addr); err != nil {
 		return "", err
-	}
+	}*/
 	switch net {
 	case "bxh":
 		txHash, err = sendTxBxh(c, address, 1)
@@ -68,6 +68,8 @@ func (c *Client) SendTra(net string, address string, erc20Addr string) (string, 
 		txHash, err = sendTraEthToken(c, address, erc20Addr, 1)
 	case "bsc":
 		txHash, err = sendTraBscToken(c, address, erc20Addr, 1)
+	case "nft":
+		txHash, err = mintNftToken(c, address, erc20Addr)
 	default:
 		return "", fmt.Errorf("invalid net: %s", net)
 	}
@@ -189,13 +191,13 @@ func (c *Client) Initialize(configPath string) error {
 	auth.GasPrice = big.NewInt(50000)
 	c.ethAuth = auth
 	// 构建auth_bsc
-	chainIDBsc, err := etherCliBSc.ChainID(c.ctx)
+	/*chainIDBsc, err := etherCliBSc.ChainID(c.ctx)
 	authBsc, err := bind.NewKeyedTransactorWithChainID(unlockedKey.PrivateKey, chainIDBsc)
 	authBsc.Context = c.ctx
 	authBsc.GasFeeCap = nil
 	authBsc.GasTipCap = nil
 	authBsc.GasPrice, _ = c.bscClient.SuggestGasPrice(c.ctx)
-	c.bscAuth = authBsc
+	c.bscAuth = authBsc*/
 
 	// 构建auth_bxh
 	keyPathBxh := filepath.Join(configPath, cfg.Bxh.BxhKeyPath)

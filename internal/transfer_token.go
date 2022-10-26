@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -10,6 +11,9 @@ import (
 func sendTraEthToken(c *Client, toAddr string, erc20Addr string, amount int64) (string, error) {
 	c.ethLock.Lock()
 	defer c.ethLock.Unlock()
+	if erc20Addr == "" {
+		return "", fmt.Errorf("erc20 不能为空")
+	}
 	//使用合约地址
 	contract, err := NewERC20(common.HexToAddress(erc20Addr), c.ethClient)
 	if err != nil {
