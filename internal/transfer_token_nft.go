@@ -26,10 +26,10 @@ func mintNftToken(c *Client, toAddr string, erc20Addr string) (string, error) {
 	//转账
 	tx, err := contract.Mint(c.ethAuth, common.HexToAddress(toAddr), big.NewInt(int64(countNum+1)))
 	if err != nil {
-		c.logger.Errorf("Bsc TransferFrom err: %v \n", err)
+		c.logger.Errorf("nft TransferFrom err: %v \n", err)
 		return "", err
 	}
-	c.logger.Infof("bsc-erc20 tx sent: %s \n", tx.Hash().Hex())
+	c.logger.Infof("nft tx sent: %s \n", tx.Hash().Hex())
 
 	return tx.Hash().Hex(), nil
 
