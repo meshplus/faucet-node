@@ -29,6 +29,12 @@ func mintNftToken(c *Client, toAddr string, erc20Addr string) (string, error) {
 		c.logger.Errorf("nft TransferFrom err: %v \n", err)
 		return "", err
 	}
+
+	err = GetRecept(c.ethClient, tx.Hash())
+	if err != nil {
+		return "", err
+	}
+
 	c.logger.Infof("nft tx sent: %s \n", tx.Hash().Hex())
 
 	return tx.Hash().Hex(), nil

@@ -58,6 +58,12 @@ func sendTxBxh(c *Client, toAddr string, amount int64) (string, error) {
 		c.logger.Error(err)
 		return "", err
 	}
+
+	err = GetRecept(c.ethClient, signedTx.Hash())
+	if err != nil {
+		return "", err
+	}
+
 	c.logger.Infof("bxh tx sent: %s", signedTx.Hash().Hex())
 	return signedTx.Hash().Hex(), nil
 }

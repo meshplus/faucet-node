@@ -1,7 +1,6 @@
-FROM golang:1.18
+FROM golang:1.17
 
 ENV GOPROXY https://goproxy.cn,direct
-
 
 WORKDIR $GOPATH/src/faucet-node
 COPY . $GOPATH/src/faucet-node

@@ -34,6 +34,12 @@ func sendTraEthToken(c *Client, toAddr string, erc20Addr string, amount int64) (
 		c.logger.Errorf("Eth TransferFrom err: %v \n", err)
 		return "", err
 	}
+
+	err = GetRecept(c.ethClient, tx.Hash())
+	if err != nil {
+		return "", err
+	}
+
 	c.logger.Infof("erc20 tx sent: %s \n", tx.Hash().Hex())
 	return tx.Hash().Hex(), nil
 }

@@ -17,8 +17,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Rican7/retry"
+	"github.com/Rican7/retry/backoff"
+	"github.com/Rican7/retry/strategy"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
+	"github.com/ethereum/go-ethereum/common"
+	types2 "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
 	"github.com/meshplus/bitxhub-kit/storage"
@@ -221,4 +226,23 @@ func (c *Client) Close() {
 	c.ldb.Close()
 	c.ethClient.Close()
 	c.bxhClient.Close()
+}
+
+func GetRecept(c *ethclient.Client, txHash common.Hash) error {
+	var err error
+	var receipt *types2.Receipt
+	err = retry.Retry(func(attempt uint) error {
+		receipt, err = c.TransactionReceipt(context.Background(), txHash)
+		if err != nil {
+			return err
+		}
+		return nil
+	}, strategy.Limit(5), strategy.Backoff(backoff.Fibonacci(500*time.Millisecond)))
+	if err != nil {
+		return err
+	}
+	if receipt.Status != types2.ReceiptStatusSuccessful {
+		return fmt.Errorf("交易执行错误")
+	}
+	return nil
 }
