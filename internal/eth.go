@@ -191,6 +191,9 @@ func (c *Client) Initialize(configPath string) error {
 	unlockedKey, err := keystore.DecryptKey(keyByte, strings.TrimSpace(string(password)))
 	chainID, err := etherCli.ChainID(c.ctx)
 	auth, err := bind.NewKeyedTransactorWithChainID(unlockedKey.PrivateKey, chainID)
+	if err != nil {
+		return err
+	}
 	auth.Context = c.ctx
 	auth.GasLimit = 100000
 	auth.GasPrice = big.NewInt(50000)

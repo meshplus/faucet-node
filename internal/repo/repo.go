@@ -1,6 +1,8 @@
 package repo
 
 import (
+	"github.com/gobuffalo/packd"
+	"github.com/gobuffalo/packr/v2"
 	"io/ioutil"
 	"log"
 	"os"
@@ -8,8 +10,6 @@ import (
 	"strings"
 
 	"github.com/fsnotify/fsnotify"
-	"github.com/gobuffalo/packd"
-	"github.com/gobuffalo/packr"
 	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/viper"
 )
@@ -46,7 +46,7 @@ func Initialize(repoRoot string) error {
 		}
 	}
 
-	box := packr.NewBox(ConfigPath)
+	box := packr.New(ConfigPath, ConfigPath)
 
 	if err := box.Walk(func(s string, file packd.File) error {
 		p := filepath.Join(repoRoot, s)
