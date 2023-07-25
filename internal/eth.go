@@ -65,8 +65,6 @@ func (c *Client) SendTra(net string, address string, erc20Addr string) (string, 
 		txHash, err = sendTxBxh(c, address, 1)
 	case "erc20":
 		txHash, err = sendTraEthToken(c, address, erc20Addr, 1)
-	case "bsc":
-		txHash, err = sendTraBscToken(c, address, erc20Addr, 1)
 	default:
 		return "", fmt.Errorf("invalid net: %s", net)
 	}
