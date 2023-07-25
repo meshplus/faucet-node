@@ -2,11 +2,15 @@ package internal
 
 import (
 	"context"
+	"fmt"
 	"math/big"
+	"time"
 
-	"github.com/ethereum/go-ethereum/common/math"
-
+	"github.com/Rican7/retry"
+	"github.com/Rican7/retry/backoff"
+	"github.com/Rican7/retry/strategy"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core/types"
 )
 
@@ -14,14 +18,6 @@ func sendTxBxh(c *Client, toAddr string, amount int64) (string, error) {
 	c.bxhLock.Lock()
 	defer c.bxhLock.Unlock()
 	client := c.bxhClient
-
-	////余额查询
-	//accountBalance, err := contract.BalanceOf(nil, common.HexToAddress("0xFDc7b0d2C02c91cB2916494076a87255051F558d"))
-	//if err != nil {
-	//	c.logger.Fatalf("get Balances err: %v \n", err)
-	//	return "", err
-	//}
-	//c.logger.Infof("tx sent: %s \n", tx.Hash().Hex())
 
 	fromAddress := c.bxhAuth.From
 	nonce, err := client.PendingNonceAt(context.Background(), fromAddress)
@@ -59,5 +55,22 @@ func sendTxBxh(c *Client, toAddr string, amount int64) (string, error) {
 		return "", err
 	}
 	c.logger.Infof("bxh tx sent: %s", signedTx.Hash().Hex())
+
+	err = retry.Retry(func(attempt uint) error {
+		receipt, err := client.TransactionReceipt(context.Background(), signedTx.Hash())
+		if err != nil {
+			return err
+		}
+		if err == nil && receipt != nil {
+			if receipt.Status == types.ReceiptStatusFailed {
+				return fmt.Errorf("faucet transfer failed")
+			}
+		}
+		return nil
+	}, strategy.Limit(3), strategy.Backoff(backoff.Fibonacci(200*time.Millisecond)))
+
+	if err != nil && err.Error() == "faucet transfer failed" {
+		return "", err
+	}
 	return signedTx.Hash().Hex(), nil
 }

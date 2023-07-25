@@ -22,8 +22,13 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/meshplus/bitxhub-kit/storage"
 	"github.com/meshplus/bitxhub-kit/storage/leveldb"
-	"github.com/meshplus/bitxhub-kit/types"
 	"github.com/sirupsen/logrus"
+)
+
+const (
+	nativeToken = "native"
+	erc20Token  = "erc20"
+	amount      = 1
 )
 
 type Client struct {
@@ -36,7 +41,6 @@ type Client struct {
 	bxhClient     *ethclient.Client
 	bxhLock       sync.Mutex
 	ethAuth       *bind.TransactOpts
-	bscAuth       *bind.TransactOpts
 	bxhAuth       *bind.TransactOpts
 	bxhPrivateKey *ecdsa.PrivateKey
 	ldb           storage.Storage
@@ -50,74 +54,75 @@ type AddressData struct {
 	Amount     int64  `json:"amount"`
 }
 
-func (c *Client) SendTra(net string, address string, erc20Addr string) (string, error) {
+func (c *Client) SendTra(net string, address string) (string, error) {
 	var (
 		txHash string
 		err    error
 	)
-
-	// 合法校验：每天每个(public_ip + ip + addr)只发一个
-	if err := c.isValid(net, address, c.ldb, erc20Addr); err != nil {
+	// 合法校验：每天每个(net + type + addr)只发一个
+	if err := c.checkLimit(net, nativeToken, address, c.ldb); err != nil {
 		return "", err
 	}
-	switch net {
-	case "bxh":
-		txHash, err = sendTxBxh(c, address, 1)
-	case "erc20":
-		txHash, err = sendTraEthToken(c, address, erc20Addr, 1)
-	default:
-		return "", fmt.Errorf("invalid net: %s", net)
-	}
-	keyAddr := address + erc20Addr
+	txHash, err = sendTxBxh(c, address, amount)
+	keyAddr := address
 	if err != nil {
-		deleteTxData(c, keyAddr, net)
+		deleteTxData(c, keyAddr, nativeToken, net)
 		return "", fmt.Errorf("txFailed: %w", err)
 	}
-	if err := putTxData(txHash, c, keyAddr, net); err != nil {
+	if err := putTxData(txHash, c, keyAddr, nativeToken, net); err != nil {
 		return "", fmt.Errorf("putTxDataFailed: %w", err)
 	}
 	return txHash, nil
 }
 
-func putTxData(txHash string, c *Client, address string, net string) error {
+func (c *Client) SendErc20(net string, address string, contractAddress string) (string, error) {
+	var (
+		txHash string
+		err    error
+	)
+	// 合法校验：每天每个(net + type + addr)只发一个
+	addressKey := address + "-" + contractAddress
+	if err := c.checkLimit(net, erc20Token, addressKey, c.ldb); err != nil {
+		return "", err
+	}
+	txHash, err = sendTraEthToken(c, address, erc20Token, amount)
+	if err != nil {
+		deleteTxData(c, addressKey, erc20Token, net)
+		return "", fmt.Errorf("txFailed: %w", err)
+	}
+	if err := putTxData(txHash, c, addressKey, erc20Token, net); err != nil {
+		return "", fmt.Errorf("putTxDataFailed: %w", err)
+	}
+	return txHash, nil
+}
+
+func putTxData(txHash string, c *Client, address string, typ string, net string) error {
 	p := &AddressData{
 		SendTxTime: time.Now().UnixNano(),
 		TxHash:     txHash,
-		Amount:     1,
+		Amount:     amount,
 	}
 	structJSON, err := json.Marshal(p)
 	if err != nil {
 		return fmt.Errorf("json marshal failed: %w", err)
 	}
-	c.ldb.Put(c.construAddressKey(net, address), structJSON)
+	c.ldb.Put(c.construAddressKey(net, typ, address), structJSON)
 	return nil
 }
 
-func deleteTxData(c *Client, address string, net string) error {
-	c.ldb.Delete(c.construAddressKey(net, address))
+func deleteTxData(c *Client, address string, typ string, net string) error {
+	c.ldb.Delete(c.construAddressKey(net, typ, address))
 	return nil
 }
 
-func (c *Client) isValid(net string, address string, ldb storage.Storage, erc20Addr string) error {
-	// address格式校验xx
-	if add := types.NewAddressByStr(address); add == nil {
-		return fmt.Errorf("invalid address: %s", address)
-	}
-	if !strings.EqualFold("bxh", net) && types.NewAddressByStr(erc20Addr) == nil {
-		return fmt.Errorf("invalid erc20Addr: %s", erc20Addr)
-	}
-	// 合法校验：每天每个addr只发一个
-	keyAddr := address + erc20Addr
-	return c.checkLimit(keyAddr, ldb, net)
-
-}
-
-func (c *Client) construAddressKey(net string, address string) []byte {
+func (c *Client) construAddressKey(net string, typ string, address string) []byte {
 	// get public_ip and ip with address and net tobe key
 	var buffer bytes.Buffer
-	buffer.WriteString(time.Now().Format("2006-01-02"))
-	buffer.WriteString("-")
 	buffer.WriteString(address)
+	buffer.WriteString("-")
+	buffer.WriteString(typ)
+	buffer.WriteString("-")
+	buffer.WriteString(time.Now().Format("2006-01-02"))
 	c.logger.Infof("construKey: %s ", buffer)
 	return persist.CompositeKey(net, buffer)
 }
@@ -134,18 +139,13 @@ func (c *Client) construIpKey(net string) []byte {
 	return persist.CompositeKey(net, buffer)
 }
 
-func (c *Client) checkLimit(address string, ldb storage.Storage, net string) error {
-	data := ldb.Get(c.construAddressKey(net, address))
+func (c *Client) checkLimit(net string, typ string, address string, ldb storage.Storage) error {
+	data := ldb.Get(c.construAddressKey(net, typ, address))
 	if data != nil {
-		//p := &AddressData{}
-		//err := json.Unmarshal([]byte(data), &p)
-		//if err != nil || len(p.TxHash) == 0 {
-		//	return true
-		//}
 		return fmt.Errorf("surpass the faucet limit: %s", "1day1amount")
 	} else {
 		// 占位
-		ldb.Put(c.construAddressKey(net, address), []byte("1"))
+		ldb.Put(c.construAddressKey(net, typ, address), []byte("1"))
 	}
 	return nil
 }
@@ -183,14 +183,6 @@ func (c *Client) Initialize(configPath string) error {
 	auth, err := bind.NewKeyedTransactorWithChainID(unlockedKey.PrivateKey, chainID)
 	auth.Context = c.ctx
 	c.ethAuth = auth
-	// 构建auth_bsc
-	chainIDBsc, err := etherCliBSc.ChainID(c.ctx)
-	authBsc, err := bind.NewKeyedTransactorWithChainID(unlockedKey.PrivateKey, chainIDBsc)
-	authBsc.Context = c.ctx
-	authBsc.GasFeeCap = nil
-	authBsc.GasTipCap = nil
-	authBsc.GasPrice, _ = c.bscClient.SuggestGasPrice(c.ctx)
-	c.bscAuth = authBsc
 
 	// 构建auth_bxh
 	keyPathBxh := filepath.Join(configPath, cfg.Bxh.BxhKeyPath)

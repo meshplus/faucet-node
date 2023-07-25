@@ -2,7 +2,10 @@ module faucet
 
 go 1.18
 
+replace github.com/meshplus/bitxhub-kit => github.com/TaiChiChain/bitxhub-kit v0.0.1
+
 require (
+	github.com/Rican7/retry v0.1.0
 	github.com/ethereum/go-ethereum v1.12.0
 	github.com/fatih/color v1.7.0
 	github.com/fsnotify/fsnotify v1.6.0

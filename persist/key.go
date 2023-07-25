@@ -3,12 +3,8 @@ package persist
 import (
 	"bytes"
 	"fmt"
-	"github.com/meshplus/bitxhub-kit/types"
-)
 
-const (
-	Erc20AddressKey = "erc20-"
-	BxhAddressKey   = "bxh-"
+	"github.com/meshplus/bitxhub-kit/types"
 )
 
 func CompositeKey(prefix string, buffer bytes.Buffer) []byte {
