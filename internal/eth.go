@@ -16,8 +16,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Rican7/retry"
+	"github.com/Rican7/retry/backoff"
+	"github.com/Rican7/retry/strategy"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
 	"github.com/meshplus/bitxhub-kit/storage"
@@ -27,8 +32,7 @@ import (
 
 const (
 	nativeToken = "native"
-	erc20Token  = "erc20"
-	amount      = 1
+	amount      = 0.5
 )
 
 type Client struct {
@@ -49,9 +53,9 @@ type Client struct {
 }
 
 type AddressData struct {
-	SendTxTime int64  `json:"sendTxTime"`
-	TxHash     string `json:"txHash"`
-	Amount     int64  `json:"amount"`
+	SendTxTime int64   `json:"sendTxTime"`
+	TxHash     string  `json:"txHash"`
+	Amount     float64 `json:"amount"`
 }
 
 func (c *Client) SendTra(net string, address string) (string, error) {
@@ -66,39 +70,19 @@ func (c *Client) SendTra(net string, address string) (string, error) {
 	txHash, err = sendTxBxh(c, address, amount)
 	keyAddr := address
 	if err != nil {
-		deleteTxData(c, keyAddr, nativeToken, net)
 		return "", fmt.Errorf("txFailed: %w", err)
 	}
-	if err := putTxData(txHash, c, keyAddr, nativeToken, net); err != nil {
-		return "", fmt.Errorf("putTxDataFailed: %w", err)
-	}
-	return txHash, nil
-}
-
-func (c *Client) SendErc20(net string, address string, contractAddress string) (string, error) {
-	var (
-		txHash string
-		err    error
-	)
-	// 合法校验：每天每个(net + type + addr)只发一个
-	addressKey := address + "-" + contractAddress
-	if err := c.checkLimit(net, erc20Token, addressKey, c.ldb); err != nil {
-		return "", err
-	}
-	txHash, err = sendTraEthToken(c, address, erc20Token, amount)
-	if err != nil {
-		deleteTxData(c, addressKey, erc20Token, net)
-		return "", fmt.Errorf("txFailed: %w", err)
-	}
-	if err := putTxData(txHash, c, addressKey, erc20Token, net); err != nil {
-		return "", fmt.Errorf("putTxDataFailed: %w", err)
+	if checkTxSuccess(c, txHash) {
+		if err := putTxData(txHash, c, keyAddr, nativeToken, net); err != nil {
+			return "", fmt.Errorf("putTxDataFailed: %w", err)
+		}
 	}
 	return txHash, nil
 }
 
 func putTxData(txHash string, c *Client, address string, typ string, net string) error {
 	p := &AddressData{
-		SendTxTime: time.Now().UnixNano(),
+		SendTxTime: time.Now().Unix(),
 		TxHash:     txHash,
 		Amount:     amount,
 	}
@@ -121,8 +105,6 @@ func (c *Client) construAddressKey(net string, typ string, address string) []byt
 	buffer.WriteString(address)
 	buffer.WriteString("-")
 	buffer.WriteString(typ)
-	buffer.WriteString("-")
-	buffer.WriteString(time.Now().Format("2006-01-02"))
 	c.logger.Infof("construKey: %s ", buffer)
 	return persist.CompositeKey(net, buffer)
 }
@@ -140,14 +122,48 @@ func (c *Client) construIpKey(net string) []byte {
 }
 
 func (c *Client) checkLimit(net string, typ string, address string, ldb storage.Storage) error {
-	data := ldb.Get(c.construAddressKey(net, typ, address))
-	if data != nil {
-		return fmt.Errorf("surpass the faucet limit: %s", "1day1amount")
-	} else {
-		// 占位
-		ldb.Put(c.construAddressKey(net, typ, address), []byte("1"))
+	value := ldb.Get(c.construAddressKey(net, typ, address))
+	if value != nil {
+		data := AddressData{}
+		if err := json.Unmarshal(value, &data); err != nil {
+			return fmt.Errorf("unmarshal error")
+		}
+		// 获取当前时间的 Unix 时间戳
+		currentUnixTime := time.Now().Unix()
+
+		// 计算时间差（以秒为单位）
+		timeDifference := currentUnixTime - data.SendTxTime
+
+		// 定义一天的秒数
+		oneDayInSeconds := int64(24 * 60 * 60)
+
+		// 比较时间差与一天的秒数
+		if timeDifference < oneDayInSeconds {
+			return fmt.Errorf("surpass the faucet limit: %s", "1day1amount")
+		}
 	}
 	return nil
+}
+
+func checkTxSuccess(c *Client, txHash string) bool {
+	client := c.bxhClient
+	err := retry.Retry(func(attempt uint) error {
+		receipt, err := client.TransactionReceipt(context.Background(), common.HexToHash(txHash))
+		if err != nil {
+			return err
+		}
+		if err == nil && receipt != nil {
+			if receipt.Status == types.ReceiptStatusFailed {
+				return fmt.Errorf("faucet transfer failed")
+			}
+		}
+		return nil
+	}, strategy.Limit(3), strategy.Backoff(backoff.Fibonacci(200*time.Millisecond)))
+	if err != nil {
+		return false
+	}
+	return true
+
 }
 
 func (c *Client) Initialize(configPath string) error {

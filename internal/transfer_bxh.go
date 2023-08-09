@@ -2,19 +2,13 @@ package internal
 
 import (
 	"context"
-	"fmt"
 	"math/big"
-	"time"
 
-	"github.com/Rican7/retry"
-	"github.com/Rican7/retry/backoff"
-	"github.com/Rican7/retry/strategy"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core/types"
 )
 
-func sendTxBxh(c *Client, toAddr string, amount int64) (string, error) {
+func sendTxBxh(c *Client, toAddr string, amount float64) (string, error) {
 	c.bxhLock.Lock()
 	defer c.bxhLock.Unlock()
 	client := c.bxhClient
@@ -26,8 +20,8 @@ func sendTxBxh(c *Client, toAddr string, amount int64) (string, error) {
 		return "", err
 	}
 
-	value := big.NewInt(math.BigPow(10, 18).Int64() * amount) // in wei (1 eth)
-	gasLimit := uint64(21000)                                 // in units
+	value := floatToEtherBigInt(amount) // in wei (1 eth)
+	gasLimit := uint64(21000)           // in units
 	gasPrice, err := client.SuggestGasPrice(context.Background())
 	if err != nil {
 		c.logger.Error(err)
@@ -56,21 +50,22 @@ func sendTxBxh(c *Client, toAddr string, amount int64) (string, error) {
 	}
 	c.logger.Infof("bxh tx sent: %s", signedTx.Hash().Hex())
 
-	err = retry.Retry(func(attempt uint) error {
-		receipt, err := client.TransactionReceipt(context.Background(), signedTx.Hash())
-		if err != nil {
-			return err
-		}
-		if err == nil && receipt != nil {
-			if receipt.Status == types.ReceiptStatusFailed {
-				return fmt.Errorf("faucet transfer failed")
-			}
-		}
-		return nil
-	}, strategy.Limit(3), strategy.Backoff(backoff.Fibonacci(200*time.Millisecond)))
-
 	if err != nil && err.Error() == "faucet transfer failed" {
 		return "", err
 	}
+
 	return signedTx.Hash().Hex(), nil
+}
+
+func floatToEtherBigInt(value float64) *big.Int {
+	decimalMultiplier := new(big.Int)
+	decimalMultiplier.Exp(big.NewInt(10), big.NewInt(18), nil)
+
+	valueAsBigFloat := new(big.Float).SetFloat64(value)
+	valueAsBigFloat.Mul(valueAsBigFloat, new(big.Float).SetInt(decimalMultiplier))
+
+	etherBigInt := new(big.Int)
+	valueAsBigFloat.Int(etherBigInt)
+
+	return etherBigInt
 }

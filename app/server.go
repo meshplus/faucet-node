@@ -7,6 +7,7 @@ import (
 	"faucet/internal/utils"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/gin-contrib/cors"
@@ -62,7 +63,13 @@ func (g *Server) Start() error {
 	v1 := g.router.Group("/faucet")
 	{
 		v1.POST("nativeToken", g.nativeToken)
-		v1.POST("erc20Token", g.erc20Token)
+		//v1.POST("erc20Token", g.erc20Token)
+	}
+
+	//used for chainlink oracle
+	v2 := g.router.Group("/test")
+	{
+		v2.GET("/uintToHex", g.uintToHex)
 	}
 
 	go func() {
@@ -108,7 +115,7 @@ func (g *Server) nativeToken(c *gin.Context) {
 	c.PureJSON(http.StatusOK, res)
 }
 
-func (g *Server) erc20Token(c *gin.Context) {
+/*func (g *Server) erc20Token(c *gin.Context) {
 	res := &response{}
 	var erc20Input erc20Input
 	if err := c.BindJSON(&erc20Input); err != nil {
@@ -141,6 +148,21 @@ func (g *Server) erc20Token(c *gin.Context) {
 	res.Msg = "ok"
 	res.Data = data
 	c.PureJSON(http.StatusOK, res)
+}*/
+
+func (g *Server) uintToHex(c *gin.Context) {
+	res := &response{}
+	input := c.Query("num")
+	num, err := strconv.Atoi(input)
+	if err != nil {
+		res.Msg = fmt.Errorf("invalid input: %s", num).Error()
+		return
+	}
+	hexString := fmt.Sprintf("%#x", num)
+	res.Msg = "ok"
+	res.Data = hexString
+	c.PureJSON(http.StatusOK, res)
+
 }
 
 func (g *Server) Stop() error {
