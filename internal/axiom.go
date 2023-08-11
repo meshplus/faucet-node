@@ -19,14 +19,14 @@ import (
 	"github.com/Rican7/retry"
 	"github.com/Rican7/retry/backoff"
 	"github.com/Rican7/retry/strategy"
+	"github.com/axiomesh/axiom-kit/storage"
+	"github.com/axiomesh/axiom-kit/storage/leveldb"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
-	"github.com/meshplus/bitxhub-kit/storage"
-	"github.com/meshplus/bitxhub-kit/storage/leveldb"
 	"github.com/sirupsen/logrus"
 )
 
@@ -36,20 +36,15 @@ const (
 )
 
 type Client struct {
-	Config        *repo.Config
-	ctx           context.Context
-	ethClient     *ethclient.Client
-	ethLock       sync.Mutex
-	bscClient     *ethclient.Client
-	bscLock       sync.Mutex
-	bxhClient     *ethclient.Client
-	bxhLock       sync.Mutex
-	ethAuth       *bind.TransactOpts
-	bxhAuth       *bind.TransactOpts
-	bxhPrivateKey *ecdsa.PrivateKey
-	ldb           storage.Storage
-	logger        logrus.FieldLogger
-	GinContext    *gin.Context
+	Config          *repo.Config
+	ctx             context.Context
+	axiomClient     *ethclient.Client
+	axiomLock       sync.Mutex
+	axiomAuth       *bind.TransactOpts
+	axiomPrivateKey *ecdsa.PrivateKey
+	ldb             storage.Storage
+	logger          logrus.FieldLogger
+	GinContext      *gin.Context
 }
 
 type AddressData struct {
@@ -67,10 +62,10 @@ func (c *Client) SendTra(net string, address string) (string, error) {
 	if err := c.checkLimit(net, nativeToken, address, c.ldb); err != nil {
 		return "", err
 	}
-	txHash, err = sendTxBxh(c, address, amount)
+	txHash, err = sendTxAxm(c, address, amount)
 	keyAddr := address
 	if err != nil {
-		return "", fmt.Errorf("txFailed: %w", err)
+		return "", fmt.Errorf("get Axm error: %w", err)
 	}
 	if checkTxSuccess(c, txHash) {
 		if err := putTxData(txHash, c, keyAddr, nativeToken, net); err != nil {
@@ -146,7 +141,7 @@ func (c *Client) checkLimit(net string, typ string, address string, ldb storage.
 }
 
 func checkTxSuccess(c *Client, txHash string) bool {
-	client := c.bxhClient
+	client := c.axiomClient
 	err := retry.Retry(func(attempt uint) error {
 		receipt, err := client.TransactionReceipt(context.Background(), common.HexToHash(txHash))
 		if err != nil {
@@ -173,42 +168,22 @@ func (c *Client) Initialize(configPath string) error {
 		return fmt.Errorf("unmarshal config for plugin :%w", err)
 	}
 	c.Config = cfg
-	// 构建eth+bxh+bsc客户端
-	etherCli, err := ethclient.Dial(cfg.Ether.Addr)
+	// 构建axiom客户端
+	axiomClient, err := ethclient.Dial(cfg.Axiom.AxiomAddr)
 	if err != nil {
-		return fmt.Errorf("dial ethereum node: %w", err)
+		return fmt.Errorf("dial axiom node: %w", err)
 	}
-	c.ethClient = etherCli
-	etherCliBSc, err := ethclient.Dial(cfg.Bsc.Addr)
-	if err != nil {
-		return fmt.Errorf("dial bsc node: %w", err)
-	}
-	c.bscClient = etherCliBSc
-	bxhClient, err := ethclient.Dial(cfg.Bxh.BxhAddr)
-	if err != nil {
-		return fmt.Errorf("dial bxh node: %w", err)
-	}
-	c.bxhClient = bxhClient
-	// 构建auth_eth
-	keyPath := filepath.Join(configPath, cfg.Ether.KeyPath)
-	keyByte, err := ioutil.ReadFile(keyPath)
-	psdPath := filepath.Join(configPath, cfg.Ether.Password)
-	password, err := ioutil.ReadFile(psdPath)
-	unlockedKey, err := keystore.DecryptKey(keyByte, strings.TrimSpace(string(password)))
-	chainID, err := etherCli.ChainID(c.ctx)
-	auth, err := bind.NewKeyedTransactorWithChainID(unlockedKey.PrivateKey, chainID)
-	auth.Context = c.ctx
-	c.ethAuth = auth
+	c.axiomClient = axiomClient
 
-	// 构建auth_bxh
-	keyPathBxh := filepath.Join(configPath, cfg.Bxh.BxhKeyPath)
-	keyByteBxh, err := ioutil.ReadFile(keyPathBxh)
-	psdPathBxh := filepath.Join(configPath, cfg.Bxh.BxhPassword)
-	passwordBxh, err := ioutil.ReadFile(psdPathBxh)
-	unlockedKeyBxh, err := keystore.DecryptKey(keyByteBxh, strings.TrimSpace(string(passwordBxh)))
-	authBxh := bind.NewKeyedTransactor(unlockedKeyBxh.PrivateKey)
-	c.bxhAuth = authBxh
-	c.bxhPrivateKey = unlockedKeyBxh.PrivateKey
+	// 构建auth_axm
+	keyPathAxm := filepath.Join(configPath, cfg.Axiom.AxiomKeyPath)
+	keyByteAxm, err := ioutil.ReadFile(keyPathAxm)
+	psdPathAxm := filepath.Join(configPath, cfg.Axiom.AxiomPassword)
+	passwordAxm, err := ioutil.ReadFile(psdPathAxm)
+	unlockedKeyAxm, err := keystore.DecryptKey(keyByteAxm, strings.TrimSpace(string(passwordAxm)))
+	authAxm := bind.NewKeyedTransactor(unlockedKeyAxm.PrivateKey)
+	c.axiomAuth = authAxm
+	c.axiomPrivateKey = unlockedKeyAxm.PrivateKey
 	// 初始化leveldb
 	leveldb, err := leveldb.New(filepath.Join(c.Config.RepoRoot, "store"))
 	if err != nil {
@@ -220,6 +195,5 @@ func (c *Client) Initialize(configPath string) error {
 }
 func (c *Client) Close() {
 	c.ldb.Close()
-	c.ethClient.Close()
-	c.bxhClient.Close()
+	c.axiomClient.Close()
 }

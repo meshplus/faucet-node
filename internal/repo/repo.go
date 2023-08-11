@@ -46,7 +46,7 @@ func Initialize(repoRoot string) error {
 		}
 	}
 
-	box := packr.NewBox(ConfigPath)
+	box := packr.New("configPath", ConfigPath)
 
 	if err := box.Walk(func(s string, file packd.File) error {
 		p := filepath.Join(repoRoot, s)

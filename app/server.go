@@ -10,9 +10,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/axiomesh/axiom-kit/types"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"github.com/meshplus/bitxhub-kit/types"
 	"github.com/sirupsen/logrus"
 )
 
@@ -63,7 +63,6 @@ func (g *Server) Start() error {
 	v1 := g.router.Group("/faucet")
 	{
 		v1.POST("nativeToken", g.nativeToken)
-		//v1.POST("erc20Token", g.erc20Token)
 	}
 
 	//used for chainlink oracle
@@ -97,7 +96,7 @@ func (g *Server) nativeToken(c *gin.Context) {
 		return
 	}
 
-	if !strings.EqualFold("bxh", nativeInput.Net) {
+	if !strings.EqualFold("axm", nativeInput.Net) {
 		res.Msg = fmt.Errorf("not support net: %s", nativeInput.Net).Error()
 		c.JSON(http.StatusInternalServerError, res)
 		return
@@ -114,41 +113,6 @@ func (g *Server) nativeToken(c *gin.Context) {
 	res.Data = data
 	c.PureJSON(http.StatusOK, res)
 }
-
-/*func (g *Server) erc20Token(c *gin.Context) {
-	res := &response{}
-	var erc20Input erc20Input
-	if err := c.BindJSON(&erc20Input); err != nil {
-		res.Msg = err.Error()
-		c.JSON(http.StatusBadRequest, res)
-		return
-	}
-	if add := types.NewAddressByStr(erc20Input.Address); add == nil {
-		res.Msg = fmt.Errorf("invalid address: %s", erc20Input.Address).Error()
-		c.JSON(http.StatusInternalServerError, res)
-		return
-	}
-	if !strings.EqualFold("bxh", erc20Input.Net) {
-		res.Msg = fmt.Errorf("not support net: %s", erc20Input.Net).Error()
-		c.JSON(http.StatusInternalServerError, res)
-		return
-	}
-	if add := types.NewAddressByStr(erc20Input.ContractAddress); add == nil {
-		res.Msg = fmt.Errorf("invalid erc20 address: %s", erc20Input.ContractAddress).Error()
-		c.JSON(http.StatusInternalServerError, res)
-		return
-	}
-	g.client.GinContext = c
-	data, err := g.client.SendErc20(erc20Input.Net, erc20Input.Address, erc20Input.ContractAddress)
-	if err != nil {
-		res.Msg = err.Error()
-		c.JSON(http.StatusInternalServerError, res)
-		return
-	}
-	res.Msg = "ok"
-	res.Data = data
-	c.PureJSON(http.StatusOK, res)
-}*/
 
 func (g *Server) uintToHex(c *gin.Context) {
 	res := &response{}

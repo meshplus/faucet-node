@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/meshplus/bitxhub-kit/types"
+	"github.com/axiomesh/axiom-kit/types"
 )
 
 func CompositeKey(prefix string, buffer bytes.Buffer) []byte {

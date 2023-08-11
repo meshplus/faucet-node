@@ -2,18 +2,30 @@ package internal
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 )
 
-func sendTxBxh(c *Client, toAddr string, amount float64) (string, error) {
-	c.bxhLock.Lock()
-	defer c.bxhLock.Unlock()
-	client := c.bxhClient
+func sendTxAxm(c *Client, toAddr string, amount float64) (string, error) {
+	c.axiomLock.Lock()
+	defer c.axiomLock.Unlock()
+	client := c.axiomClient
 
-	fromAddress := c.bxhAuth.From
+	fromAddress := c.axiomAuth.From
+	////余额查询
+	balanceNow, err := client.BalanceAt(context.Background(), common.HexToAddress(toAddr), nil)
+	if err != nil {
+		c.logger.Error(err)
+		return "", err
+	}
+	limit := floatToEtherBigInt(3)
+	if balanceNow.Cmp(limit) >= 0 {
+		return "", fmt.Errorf("The axm balance in your account is greater than 3")
+	}
+
 	nonce, err := client.PendingNonceAt(context.Background(), fromAddress)
 	if err != nil {
 		c.logger.Error(err)
@@ -37,7 +49,7 @@ func sendTxBxh(c *Client, toAddr string, amount float64) (string, error) {
 		return "", err
 	}
 
-	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainID), c.bxhPrivateKey)
+	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainID), c.axiomPrivateKey)
 	if err != nil {
 		c.logger.Error(err)
 		return "", err
@@ -48,7 +60,7 @@ func sendTxBxh(c *Client, toAddr string, amount float64) (string, error) {
 		c.logger.Error(err)
 		return "", err
 	}
-	c.logger.Infof("bxh tx sent: %s", signedTx.Hash().Hex())
+	c.logger.Infof("axm tx sent: %s", signedTx.Hash().Hex())
 
 	if err != nil && err.Error() == "faucet transfer failed" {
 		return "", err
