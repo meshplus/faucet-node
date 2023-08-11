@@ -42,15 +42,15 @@ test:
 	@$(GO) test ${TEST_PKGS} -count=1
 
 
-packr:
-	cd internal/repo && packr
+packr2:
+	cd internal/repo && packr2
 
 ## make install: Go install the project (hpc)
-install: packr
+install: packr2
 	$(GO) install -ldflags '${GOLDFLAGS}' ./cmd/${APP_NAME}
 	@printf "${GREEN}Build Faucet successfully${NC}\n"
 
-build: packr
+build: packr2
 	@mkdir -p bin
 	$(GO) build -ldflags '${GOLDFLAGS}' ./cmd/${APP_NAME}
 	@mv ./faucet bin

@@ -7,7 +7,10 @@ import (
 	"faucet/internal/utils"
 	"fmt"
 	"net/http"
+	"strconv"
+	"strings"
 
+	"github.com/axiomesh/axiom-kit/types"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
@@ -26,10 +29,15 @@ type Server struct {
 	cancel context.CancelFunc
 }
 
-type ComeInput struct {
-	Net       string `json:"net"`
-	Address   string `json:"address"`
-	Erc20Addr string `json:"erc20_addr"`
+type nativeInput struct {
+	Net     string `json:"net"`
+	Address string `json:"address"`
+}
+
+type erc20Input struct {
+	Net             string `json:"net"`
+	Address         string `json:"address"`
+	ContractAddress string `json:"contractAddress"`
 }
 
 type response struct {
@@ -52,9 +60,15 @@ func NewServer(client *internal.Client) (*Server, error) {
 
 func (g *Server) Start() error {
 	g.router.Use(gin.Recovery()).Use(cors.Default()).Use(g.MaxAllowed(200))
-	v1 := g.router.Group("/v1")
+	v1 := g.router.Group("/faucet")
 	{
-		v1.POST("come", g.come)
+		v1.POST("nativeToken", g.nativeToken)
+	}
+
+	//used for chainlink oracle
+	v2 := g.router.Group("/test")
+	{
+		v2.GET("/uintToHex", g.uintToHex)
 	}
 
 	go func() {
@@ -68,16 +82,28 @@ func (g *Server) Start() error {
 	return nil
 }
 
-func (g *Server) come(c *gin.Context) {
+func (g *Server) nativeToken(c *gin.Context) {
 	res := &response{}
-	var comeInput ComeInput
-	if err := c.BindJSON(&comeInput); err != nil {
+	var nativeInput nativeInput
+	if err := c.BindJSON(&nativeInput); err != nil {
 		res.Msg = err.Error()
 		c.JSON(http.StatusBadRequest, res)
 		return
 	}
+	if add := types.NewAddressByStr(nativeInput.Address); add == nil {
+		res.Msg = fmt.Errorf("invalid address: %s", nativeInput.Address).Error()
+		c.JSON(http.StatusInternalServerError, res)
+		return
+	}
+
+	if !strings.EqualFold("axm", nativeInput.Net) {
+		res.Msg = fmt.Errorf("not support net: %s", nativeInput.Net).Error()
+		c.JSON(http.StatusInternalServerError, res)
+		return
+	}
+
 	g.client.GinContext = c
-	data, err := g.client.SendTra(comeInput.Net, comeInput.Address, comeInput.Erc20Addr)
+	data, err := g.client.SendTra(nativeInput.Net, nativeInput.Address)
 	if err != nil {
 		res.Msg = err.Error()
 		c.JSON(http.StatusInternalServerError, res)
@@ -88,6 +114,21 @@ func (g *Server) come(c *gin.Context) {
 	c.PureJSON(http.StatusOK, res)
 }
 
+func (g *Server) uintToHex(c *gin.Context) {
+	res := &response{}
+	input := c.Query("num")
+	num, err := strconv.Atoi(input)
+	if err != nil {
+		res.Msg = fmt.Errorf("invalid input: %s", num).Error()
+		return
+	}
+	hexString := fmt.Sprintf("%#x", num)
+	res.Msg = "ok"
+	res.Data = hexString
+	c.PureJSON(http.StatusOK, res)
+
+}
+
 func (g *Server) Stop() error {
 	g.client.Close()
 	g.cancel()
@@ -95,7 +136,7 @@ func (g *Server) Stop() error {
 	return nil
 }
 
-//MaxAllowed 限流器
+// MaxAllowed 限流器
 func (g *Server) MaxAllowed(limitValue int64) func(c *gin.Context) {
 	limiter := utils.NewLimiter(limitValue)
 	g.logger.Infof("limiter.SetMax: %d", limitValue)

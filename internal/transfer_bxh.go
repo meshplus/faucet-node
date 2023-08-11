@@ -2,36 +2,38 @@ package internal
 
 import (
 	"context"
+	"fmt"
 	"math/big"
-
-	"github.com/ethereum/go-ethereum/common/math"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 )
 
-func sendTxBxh(c *Client, toAddr string, amount int64) (string, error) {
-	c.bxhLock.Lock()
-	defer c.bxhLock.Unlock()
-	client := c.bxhClient
+func sendTxAxm(c *Client, toAddr string, amount float64) (string, error) {
+	c.axiomLock.Lock()
+	defer c.axiomLock.Unlock()
+	client := c.axiomClient
 
+	fromAddress := c.axiomAuth.From
 	////余额查询
-	//accountBalance, err := contract.BalanceOf(nil, common.HexToAddress("0xFDc7b0d2C02c91cB2916494076a87255051F558d"))
-	//if err != nil {
-	//	c.logger.Fatalf("get Balances err: %v \n", err)
-	//	return "", err
-	//}
-	//c.logger.Infof("tx sent: %s \n", tx.Hash().Hex())
+	balanceNow, err := client.BalanceAt(context.Background(), common.HexToAddress(toAddr), nil)
+	if err != nil {
+		c.logger.Error(err)
+		return "", err
+	}
+	limit := floatToEtherBigInt(3)
+	if balanceNow.Cmp(limit) >= 0 {
+		return "", fmt.Errorf("The axm balance in your account is greater than 3")
+	}
 
-	fromAddress := c.bxhAuth.From
 	nonce, err := client.PendingNonceAt(context.Background(), fromAddress)
 	if err != nil {
 		c.logger.Error(err)
 		return "", err
 	}
 
-	value := big.NewInt(math.BigPow(10, 18).Int64() * amount) // in wei (1 eth)
-	gasLimit := uint64(21000)                                 // in units
+	value := floatToEtherBigInt(amount) // in wei (1 eth)
+	gasLimit := uint64(21000)           // in units
 	gasPrice, err := client.SuggestGasPrice(context.Background())
 	if err != nil {
 		c.logger.Error(err)
@@ -47,7 +49,7 @@ func sendTxBxh(c *Client, toAddr string, amount int64) (string, error) {
 		return "", err
 	}
 
-	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainID), c.bxhPrivateKey)
+	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainID), c.axiomPrivateKey)
 	if err != nil {
 		c.logger.Error(err)
 		return "", err
@@ -58,6 +60,24 @@ func sendTxBxh(c *Client, toAddr string, amount int64) (string, error) {
 		c.logger.Error(err)
 		return "", err
 	}
-	c.logger.Infof("bxh tx sent: %s", signedTx.Hash().Hex())
+	c.logger.Infof("axm tx sent: %s", signedTx.Hash().Hex())
+
+	if err != nil && err.Error() == "faucet transfer failed" {
+		return "", err
+	}
+
 	return signedTx.Hash().Hex(), nil
+}
+
+func floatToEtherBigInt(value float64) *big.Int {
+	decimalMultiplier := new(big.Int)
+	decimalMultiplier.Exp(big.NewInt(10), big.NewInt(18), nil)
+
+	valueAsBigFloat := new(big.Float).SetFloat64(value)
+	valueAsBigFloat.Mul(valueAsBigFloat, new(big.Float).SetInt(decimalMultiplier))
+
+	etherBigInt := new(big.Int)
+	valueAsBigFloat.Int(etherBigInt)
+
+	return etherBigInt
 }
