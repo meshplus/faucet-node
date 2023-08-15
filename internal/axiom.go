@@ -133,7 +133,7 @@ func (c *Client) checkLimit(net string, typ string, address string, ldb storage.
 		oneDayInSeconds := int64(24 * 60 * 60)
 
 		// 比较时间差与一天的秒数
-		if timeDifference < oneDayInSeconds {
+		if timeDifference <= oneDayInSeconds {
 			return fmt.Errorf("The address has recently received test tokens")
 		}
 	}
