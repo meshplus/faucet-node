@@ -134,7 +134,7 @@ func (c *Client) checkLimit(net string, typ string, address string, ldb storage.
 
 		// 比较时间差与一天的秒数
 		if timeDifference < oneDayInSeconds {
-			return fmt.Errorf("surpass the faucet limit: %s", "1day1amount")
+			return fmt.Errorf("The address has recently received test tokens")
 		}
 	}
 	return nil

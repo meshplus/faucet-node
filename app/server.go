@@ -7,10 +7,10 @@ import (
 	"faucet/internal/utils"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 
-	"github.com/axiomesh/axiom-kit/types"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
@@ -90,7 +90,8 @@ func (g *Server) nativeToken(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, res)
 		return
 	}
-	if add := types.NewAddressByStr(nativeInput.Address); add == nil {
+
+	if judge := IsValidEthereumAddress(nativeInput.Address); !judge {
 		res.Msg = fmt.Errorf("invalid address: %s", nativeInput.Address).Error()
 		c.JSON(http.StatusInternalServerError, res)
 		return
@@ -148,4 +149,11 @@ func (g *Server) MaxAllowed(limitValue int64) func(c *gin.Context) {
 		}
 		c.Next()
 	}
+}
+
+func IsValidEthereumAddress(address string) bool {
+	// 正则表达式模式匹配以太坊地址
+	pattern := "^0x[0-9a-fA-F]{40}$"
+	regex := regexp.MustCompile(pattern)
+	return regex.MatchString(address)
 }

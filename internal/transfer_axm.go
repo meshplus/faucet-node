@@ -9,21 +9,25 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 )
 
+const (
+	limit = 2.5
+)
+
 func sendTxAxm(c *Client, toAddr string, amount float64) (string, error) {
 	c.axiomLock.Lock()
 	defer c.axiomLock.Unlock()
 	client := c.axiomClient
 
 	fromAddress := c.axiomAuth.From
-	////余额查询
+	//余额查询
 	balanceNow, err := client.BalanceAt(context.Background(), common.HexToAddress(toAddr), nil)
 	if err != nil {
 		c.logger.Error(err)
 		return "", err
 	}
-	limit := floatToEtherBigInt(3)
+	limit := floatToEtherBigInt(limit)
 	if balanceNow.Cmp(limit) >= 0 {
-		return "", fmt.Errorf("The axm balance in your account is greater than 3")
+		return "", fmt.Errorf("The address already has enough test tokens")
 	}
 
 	nonce, err := client.PendingNonceAt(context.Background(), fromAddress)
