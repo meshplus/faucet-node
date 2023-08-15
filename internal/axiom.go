@@ -65,7 +65,7 @@ func (c *Client) SendTra(net string, address string) (string, error) {
 	txHash, err = sendTxAxm(c, address, amount)
 	keyAddr := address
 	if err != nil {
-		return "", fmt.Errorf("get Axm error: %w", err)
+		return "", err
 	}
 	if checkTxSuccess(c, txHash) {
 		if err := putTxData(txHash, c, keyAddr, nativeToken, net); err != nil {
@@ -133,7 +133,7 @@ func (c *Client) checkLimit(net string, typ string, address string, ldb storage.
 		oneDayInSeconds := int64(24 * 60 * 60)
 
 		// 比较时间差与一天的秒数
-		if timeDifference < oneDayInSeconds {
+		if timeDifference <= oneDayInSeconds {
 			return fmt.Errorf("The address has recently received test tokens")
 		}
 	}
