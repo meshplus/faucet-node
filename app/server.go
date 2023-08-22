@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/gin-contrib/cors"
@@ -65,12 +64,6 @@ func (g *Server) Start() error {
 		v1.POST("nativeToken", g.nativeToken)
 	}
 
-	//used for chainlink oracle
-	v2 := g.router.Group("/test")
-	{
-		v2.GET("/uintToHex", g.uintToHex)
-	}
-
 	go func() {
 		g.logger.Infoln("start gin success")
 		err := g.router.Run(fmt.Sprintf(":%s", g.client.Config.Network.Port))
@@ -113,21 +106,6 @@ func (g *Server) nativeToken(c *gin.Context) {
 	res.Msg = "ok"
 	res.Data = data
 	c.PureJSON(http.StatusOK, res)
-}
-
-func (g *Server) uintToHex(c *gin.Context) {
-	res := &response{}
-	input := c.Query("num")
-	num, err := strconv.Atoi(input)
-	if err != nil {
-		res.Msg = fmt.Errorf("invalid input: %s", num).Error()
-		return
-	}
-	hexString := fmt.Sprintf("%#x", num)
-	res.Msg = "ok"
-	res.Data = hexString
-	c.PureJSON(http.StatusOK, res)
-
 }
 
 func (g *Server) Stop() error {
