@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"regexp"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -62,13 +63,17 @@ func sendTxAxm(c *Client, toAddr string, amount float64) (string, error) {
 	err = client.SendTransaction(context.Background(), signedTx)
 	if err != nil {
 		c.logger.Error(err)
+		matched, err := regexp.MatchString("insufficient funds", err.Error())
+		if err != nil {
+			return "", err
+		}
+		if matched {
+			return "", fmt.Errorf("faucet error")
+		}
+
 		return "", err
 	}
 	c.logger.Infof("axm tx sent: %s", signedTx.Hash().Hex())
-
-	if err != nil && err.Error() == "faucet transfer failed" {
-		return "", err
-	}
 
 	return signedTx.Hash().Hex(), nil
 }

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/ecdsa"
+	"encoding/hex"
 	"encoding/json"
 	"faucet/internal/loggers"
 	"faucet/internal/repo"
@@ -22,9 +23,9 @@ import (
 	"github.com/axiomesh/axiom-kit/storage"
 	"github.com/axiomesh/axiom-kit/storage/leveldb"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
@@ -178,12 +179,22 @@ func (c *Client) Initialize(configPath string) error {
 	// 构建auth_axm
 	keyPathAxm := filepath.Join(configPath, cfg.Axiom.AxiomKeyPath)
 	keyByteAxm, err := ioutil.ReadFile(keyPathAxm)
-	psdPathAxm := filepath.Join(configPath, cfg.Axiom.AxiomPassword)
-	passwordAxm, err := ioutil.ReadFile(psdPathAxm)
-	unlockedKeyAxm, err := keystore.DecryptKey(keyByteAxm, strings.TrimSpace(string(passwordAxm)))
-	authAxm := bind.NewKeyedTransactor(unlockedKeyAxm.PrivateKey)
+	if err != nil {
+		return err
+	}
+	private := strings.TrimSpace(string(keyByteAxm))
+	privateKeyBytes, err := hex.DecodeString(private)
+	if err != nil {
+		return fmt.Errorf("Error decoding private key hex:", err)
+	}
+	privateKey, err := crypto.ToECDSA(privateKeyBytes)
+	if err != nil {
+		return fmt.Errorf("Error converting to ECDSA private key:", err)
+	}
+	c.axiomPrivateKey = privateKey
+	authAxm := bind.NewKeyedTransactor(privateKey)
 	c.axiomAuth = authAxm
-	c.axiomPrivateKey = unlockedKeyAxm.PrivateKey
+
 	// 初始化leveldb
 	leveldb, err := leveldb.New(filepath.Join(c.Config.RepoRoot, "store"))
 	if err != nil {
