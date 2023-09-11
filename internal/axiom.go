@@ -59,17 +59,17 @@ func (c *Client) SendTra(net string, address string) (string, error) {
 		txHash string
 		err    error
 	)
+	lowerAddress := strings.ToLower(address)
 	// 合法校验：每天每个(net + type + addr)只发一个
-	if err := c.checkLimit(net, nativeToken, address, c.ldb); err != nil {
+	if err := c.checkLimit(net, nativeToken, lowerAddress, c.ldb); err != nil {
 		return "", err
 	}
 	txHash, err = sendTxAxm(c, address, amount)
-	keyAddr := address
 	if err != nil {
 		return "", err
 	}
 	if checkTxSuccess(c, txHash) {
-		if err := putTxData(txHash, c, keyAddr, nativeToken, net); err != nil {
+		if err := putTxData(txHash, c, lowerAddress, nativeToken, net); err != nil {
 			return "", fmt.Errorf("putTxDataFailed: %w", err)
 		}
 	}
