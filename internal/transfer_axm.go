@@ -63,9 +63,9 @@ func sendTxAxm(c *Client, toAddr string, amount float64) (string, error) {
 	err = client.SendTransaction(context.Background(), signedTx)
 	if err != nil {
 		c.logger.Error(err)
-		matched, err := regexp.MatchString("insufficient funds", err.Error())
-		if err != nil {
-			return "", err
+		matched, matchErr := regexp.MatchString("insufficient funds", err.Error())
+		if matchErr != nil {
+			return "", matchErr
 		}
 		if matched {
 			return "", fmt.Errorf("faucet error")
