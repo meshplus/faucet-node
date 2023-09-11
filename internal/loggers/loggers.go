@@ -2,7 +2,8 @@ package loggers
 
 import (
 	repo "faucet/internal/repo"
-	"github.com/meshplus/bitxhub-kit/log"
+
+	"github.com/axiomesh/axiom-kit/log"
 	"github.com/sirupsen/logrus"
 )
 

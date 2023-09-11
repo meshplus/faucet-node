@@ -13,9 +13,7 @@ const (
 
 type Config struct {
 	RepoRoot string
-	Ether    Ether   `toml:"ether" json:"ether"`
-	Bsc      Bsc     `toml:"bsc" json:"bsc"`
-	Bxh      Bxh     `toml:"bxh" json:"bxh"`
+	Axiom    AXIOM   `toml:"axiom" json:"axiom"`
 	Network  Network `toml:"network" json:"network"`
 	Log      Log     `toml:"log" json:"log"`
 }
@@ -32,25 +30,10 @@ type LogModule struct {
 	ApiServer string `mapstructure:"api_server" toml:"api_server" json:"api_server"`
 }
 
-type Ether struct {
-	Addr       string `toml:"addr" json:"addr"`
-	Name       string `toml:"name" json:"name"`
-	KeyPath    string `mapstructure:"key_path" json:"key_path"`
-	Password   string `toml:"password" json:"password"`
-	MinConfirm uint64 `mapstructure:"min_confirm" json:"min_confirm"`
-}
-type Bsc struct {
-	Addr       string `toml:"addr" json:"addr"`
-	Name       string `toml:"name" json:"name"`
-	KeyPath    string `mapstructure:"key_path" json:"key_path"`
-	Password   string `toml:"password" json:"password"`
-	MinConfirm uint64 `mapstructure:"min_confirm" json:"min_confirm"`
-}
-type Bxh struct {
-	BxhAddr     string `mapstructure:"bxh_addr" json:"bxh_addr"`
-	BxhKeyPath  string `mapstructure:"bxh_key_path" json:"bxh_key_path"`
-	BxhPassword string `mapstructure:"bxh_password" json:"bxh_password"`
-	MinConfirm  uint64 `mapstructure:"min_confirm" json:"min_confirm"`
+type AXIOM struct {
+	AxiomAddr    string `mapstructure:"axiom_addr" json:"axiom_addr"`
+	AxiomKeyPath string `mapstructure:"axiom_key_path" json:"axiom_key_path"`
+	MinConfirm   uint64 `mapstructure:"min_confirm" json:"min_confirm"`
 }
 
 type Network struct {

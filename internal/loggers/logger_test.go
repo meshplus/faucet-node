@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/meshplus/bitxhub-kit/types"
+	"github.com/axiomesh/axiom-kit/types"
 )
 
 func TestLogger(t *testing.T) {

@@ -9,7 +9,7 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/gobuffalo/packd"
-	"github.com/gobuffalo/packr"
+	"github.com/gobuffalo/packr/v2"
 	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/viper"
 )
@@ -46,7 +46,7 @@ func Initialize(repoRoot string) error {
 		}
 	}
 
-	box := packr.NewBox(ConfigPath)
+	box := packr.New("configPath", ConfigPath)
 
 	if err := box.Walk(func(s string, file packd.File) error {
 		p := filepath.Join(repoRoot, s)

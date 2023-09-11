@@ -7,7 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/meshplus/bitxhub-kit/fileutil"
+	"github.com/axiomesh/axiom-kit/fileutil"
 	"github.com/urfave/cli"
 )
 
