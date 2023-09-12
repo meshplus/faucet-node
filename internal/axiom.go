@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -66,7 +67,15 @@ func (c *Client) SendTra(net string, address string) (string, error) {
 	}
 	txHash, err = sendTxAxm(c, address, amount)
 	if err != nil {
-		return "", err
+		c.logger.Error(err)
+		matched, matchErr := regexp.MatchString("insufficient funds", err.Error())
+		if matchErr != nil {
+			return "", matchErr
+		}
+		if matched {
+			return "", fmt.Errorf("faucet error")
+		}
+		return "", fmt.Errorf("axiomledger Network Error，Please Try Again Later！")
 	}
 	if checkTxSuccess(c, txHash) {
 		if err := putTxData(txHash, c, lowerAddress, nativeToken, net); err != nil {
