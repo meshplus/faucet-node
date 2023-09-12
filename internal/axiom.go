@@ -67,7 +67,9 @@ func (c *Client) SendTra(net string, address string) (string, error) {
 	}
 	txHash, err = sendTxAxm(c, address, amount)
 	if err != nil {
-		c.logger.Error(err)
+		if err.Error() == "The address already has enough test tokens" {
+			return "", err
+		}
 		matched, matchErr := regexp.MatchString("insufficient funds", err.Error())
 		if matchErr != nil {
 			return "", matchErr
