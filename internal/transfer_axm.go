@@ -9,10 +9,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 )
 
-const (
-	limit = 2.5
-)
-
 func sendTxAxm(c *Client, toAddr string, amount float64) (string, error) {
 	c.axiomLock.Lock()
 	defer c.axiomLock.Unlock()
@@ -25,7 +21,7 @@ func sendTxAxm(c *Client, toAddr string, amount float64) (string, error) {
 		c.logger.Error(err)
 		return "", err
 	}
-	limit := floatToEtherBigInt(limit)
+	limit := floatToEtherBigInt(c.Config.Axiom.Limit)
 	if balanceNow.Cmp(limit) >= 0 {
 		return "", fmt.Errorf("The address already has enough test tokens")
 	}
