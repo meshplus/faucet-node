@@ -145,7 +145,7 @@ func (c *Client) checkLimit(net string, typ string, address string, ldb storage.
 
 		// 比较时间差与一天的秒数
 		if timeDifference <= oneDayInSeconds {
-			return fmt.Errorf("The address has recently received test tokens")
+			return fmt.Errorf("Sorry! To be fair to all developers, we only send 100 AXM every 24 hours. Please try again after 24 hours from your original request.")
 		}
 	}
 	return nil
