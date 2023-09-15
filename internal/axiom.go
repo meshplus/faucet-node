@@ -34,7 +34,6 @@ import (
 
 const (
 	nativeToken = "native"
-	amount      = 0.5
 )
 
 type Client struct {
@@ -65,7 +64,7 @@ func (c *Client) SendTra(net string, address string) (string, error) {
 	if err := c.checkLimit(net, nativeToken, lowerAddress, c.ldb); err != nil {
 		return "", err
 	}
-	txHash, err = sendTxAxm(c, address, amount)
+	txHash, err = sendTxAxm(c, address, c.Config.Axiom.Amount)
 	if err != nil {
 		if err.Error() == "The address already has enough test tokens" {
 			return "", err
@@ -91,7 +90,7 @@ func putTxData(txHash string, c *Client, address string, typ string, net string)
 	p := &AddressData{
 		SendTxTime: time.Now().Unix(),
 		TxHash:     txHash,
-		Amount:     amount,
+		Amount:     c.Config.Axiom.Amount,
 	}
 	structJSON, err := json.Marshal(p)
 	if err != nil {

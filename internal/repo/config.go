@@ -31,9 +31,11 @@ type LogModule struct {
 }
 
 type AXIOM struct {
-	AxiomAddr    string `mapstructure:"axiom_addr" json:"axiom_addr"`
-	AxiomKeyPath string `mapstructure:"axiom_key_path" json:"axiom_key_path"`
-	MinConfirm   uint64 `mapstructure:"min_confirm" json:"min_confirm"`
+	AxiomAddr    string  `mapstructure:"axiom_addr" json:"axiom_addr"`
+	AxiomKeyPath string  `mapstructure:"axiom_key_path" json:"axiom_key_path"`
+	Amount       float64 `mapstructure:"amount" json:"amount"`
+	Limit        float64 `mapstructure:"limit" json:"limit"`
+	MinConfirm   uint64  `mapstructure:"min_confirm" json:"min_confirm"`
 }
 
 type Network struct {
