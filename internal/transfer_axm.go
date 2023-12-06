@@ -2,6 +2,7 @@ package internal
 
 import (
 	"context"
+	"faucet/global"
 	"fmt"
 	"math/big"
 
@@ -23,7 +24,7 @@ func sendTxAxm(c *Client, toAddr string, amount float64) (string, error) {
 	}
 	limit := floatToEtherBigInt(c.Config.Axiom.Limit)
 	if balanceNow.Cmp(limit) >= 0 {
-		return "", fmt.Errorf("The address already has enough test tokens")
+		return "", fmt.Errorf(global.EnoughTokenMsg)
 	}
 
 	nonce, err := client.PendingNonceAt(context.Background(), fromAddress)
@@ -33,7 +34,7 @@ func sendTxAxm(c *Client, toAddr string, amount float64) (string, error) {
 	}
 
 	value := floatToEtherBigInt(amount) // in wei (1 eth)
-	gasLimit := uint64(21000)           // in units
+	gasLimit := uint64(global.GasLimit) // in units
 	gasPrice, err := client.SuggestGasPrice(context.Background())
 	if err != nil {
 		c.logger.Error(err)
@@ -62,6 +63,22 @@ func sendTxAxm(c *Client, toAddr string, amount float64) (string, error) {
 	c.logger.Infof("axm tx sent: %s", signedTx.Hash().Hex())
 
 	return signedTx.Hash().Hex(), nil
+}
+
+func checkBalance(c *Client, toAddr string) (bool, error) {
+	client := c.axiomClient
+	//余额查询
+	balanceNow, err := client.BalanceAt(context.Background(), common.HexToAddress(toAddr), nil)
+	if err != nil {
+		c.logger.Error(err)
+		return false, err
+	}
+	limit := floatToEtherBigInt(c.Config.Axiom.Limit)
+	if balanceNow.Cmp(limit) >= 0 {
+		return false, fmt.Errorf(global.EnoughTokenMsg)
+	}
+	return true, nil
+
 }
 
 func floatToEtherBigInt(value float64) *big.Int {

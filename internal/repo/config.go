@@ -13,9 +13,14 @@ const (
 
 type Config struct {
 	RepoRoot string
-	Axiom    AXIOM   `toml:"axiom" json:"axiom"`
-	Network  Network `toml:"network" json:"network"`
-	Log      Log     `toml:"log" json:"log"`
+	Axiom    AXIOM    `toml:"axiom" json:"axiom"`
+	Network  Network  `toml:"network" json:"network"`
+	Log      Log      `toml:"log" json:"log"`
+	Scrapper Scrapper `toml:"scrapper" json:"scrapper"`
+}
+
+type Scrapper struct {
+	ScrapperAddr string `mapstructure:"scrapper_addr" json:"scrapper_addr"`
 }
 
 // Log are config about log
@@ -34,6 +39,7 @@ type AXIOM struct {
 	AxiomAddr    string  `mapstructure:"axiom_addr" json:"axiom_addr"`
 	AxiomKeyPath string  `mapstructure:"axiom_key_path" json:"axiom_key_path"`
 	Amount       float64 `mapstructure:"amount" json:"amount"`
+	TweetAmount  float64 `mapstructure:"tweet_amount" json:"tweet_amount"`
 	Limit        float64 `mapstructure:"limit" json:"limit"`
 	MinConfirm   uint64  `mapstructure:"min_confirm" json:"min_confirm"`
 }
