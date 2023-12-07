@@ -61,7 +61,7 @@ func (c *Client) TweetReqCheck(tweetURL string, addr string) (int, string) {
 			switch apiResp.Message {
 			case "The address is not in the tweet":
 				return global.TweetAddrErrCode, global.TweetAddrErrMsg
-			case "Err quote tweet":
+			case "Err quote tweet", "No tweet content":
 				return global.TweetLinkErrCode, global.TweetLinkErrMsg
 			case "Err quote tweet time", "Expired tweet":
 				return global.TweetTimeErrCode, global.TweetTimeErrMsg

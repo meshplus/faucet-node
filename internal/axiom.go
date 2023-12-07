@@ -33,10 +33,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const (
-	nativeToken = "native"
-)
-
 type Client struct {
 	Config          *repo.Config
 	ctx             context.Context
@@ -62,14 +58,14 @@ func (c *Client) SendTra(net string, address string, amount float64, tweetUrl st
 	)
 	lowerAddress := strings.ToLower(address)
 	// 合法校验：每天每个(net + type + addr)只发一个
-	if err := c.checkLimit(net, nativeToken, lowerAddress, c.ldb); err != nil {
+	if err := c.checkLimit(net, global.NativeToken, lowerAddress, c.ldb); err != nil {
 		if err.Error() == global.AddrPreLockErrMsg {
 			return "", global.AddrPreLockErrCode, err
 		} else {
 			return "", global.ReqWithinDayCode, err
 		}
 	}
-	c.ldb.Put(c.construPreLockAddressKey(net, nativeToken, address), []byte("preLock"))
+	c.ldb.Put(c.construPreLockAddressKey(net, global.NativeToken, address), []byte("preLock"))
 	if tweetUrl != "" {
 		code, msg := c.TweetReqCheck(tweetUrl, address)
 		if code != global.SUCCESS {
@@ -78,7 +74,6 @@ func (c *Client) SendTra(net string, address string, amount float64, tweetUrl st
 	}
 
 	txHash, err = sendTxAxm(c, address, amount)
-	DeleteTxData(c, address, nativeToken, net)
 	if err != nil {
 		if err.Error() == global.EnoughTokenMsg {
 			return "", global.EnoughTokenCode, err
@@ -93,7 +88,7 @@ func (c *Client) SendTra(net string, address string, amount float64, tweetUrl st
 		return "", global.CommonErrCode, fmt.Errorf(global.CommonErrMsg)
 	}
 	if checkTxSuccess(c, txHash) {
-		if err := putTxData(txHash, c, lowerAddress, nativeToken, net); err != nil {
+		if err := putTxData(txHash, c, lowerAddress, global.NativeToken, net); err != nil {
 			return "", global.CommonErrCode, fmt.Errorf(global.CommonErrMsg)
 		}
 	}
@@ -103,7 +98,7 @@ func (c *Client) SendTra(net string, address string, amount float64, tweetUrl st
 func (c *Client) PreCheck(net string, address string) (int, error) {
 	lowerAddress := strings.ToLower(address)
 	// 合法校验：每天每个(net + type + addr)只发一个
-	if err := c.checkLimit(net, nativeToken, lowerAddress, c.ldb); err != nil {
+	if err := c.checkLimit(net, global.NativeToken, lowerAddress, c.ldb); err != nil {
 		if err.Error() == global.AddrPreLockErrMsg {
 			return global.AddrPreLockErrCode, err
 		} else {
