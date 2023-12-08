@@ -43,6 +43,7 @@ type Client struct {
 	ldb             storage.Storage
 	logger          logrus.FieldLogger
 	GinContext      *gin.Context
+	preLockCheck    sync.Mutex
 }
 
 type AddressData struct {
@@ -65,7 +66,7 @@ func (c *Client) SendTra(net string, address string, amount float64, tweetUrl st
 			return "", global.ReqWithinDayCode, err
 		}
 	}
-	c.ldb.Put(c.construPreLockAddressKey(net, global.NativeToken, address), []byte("preLock"))
+
 	if tweetUrl != "" {
 		code, msg := c.TweetReqCheck(tweetUrl, address)
 		if code != global.SUCCESS {
@@ -169,11 +170,13 @@ func (c *Client) construIpKey(net string) []byte {
 }
 
 func (c *Client) checkLimit(net string, typ string, address string, ldb storage.Storage) error {
+	c.preLockCheck.Lock()
+	defer c.preLockCheck.Unlock()
 	valuePreLockData := ldb.Get(c.construPreLockAddressKey(net, typ, address))
 	if valuePreLockData != nil {
-		return fmt.Errorf(global.ReqWithinDayMsg)
+		return fmt.Errorf(global.AddrPreLockErrMsg)
 	}
-
+	c.ldb.Put(c.construPreLockAddressKey(net, global.NativeToken, address), []byte("preLock"))
 	value := ldb.Get(c.construAddressKey(net, typ, address))
 	if value != nil {
 		data := AddressData{}
