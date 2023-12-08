@@ -153,7 +153,8 @@ func (c *Client) construPreLockAddressKey(net string, typ string, address string
 	buffer.WriteString(time.Now().Format("2006-01-02"))
 	buffer.WriteString("-")
 	buffer.WriteString(address)
-	c.logger.Infof("construKey: %s ", buffer)
+	buffer.WriteString("-")
+	buffer.WriteString(typ)
 	return persist.CompositeKey(net, buffer)
 }
 
@@ -172,6 +173,7 @@ func (c *Client) construIpKey(net string) []byte {
 func (c *Client) checkLimit(net string, typ string, address string, ldb storage.Storage) error {
 	c.preLockCheck.Lock()
 	defer c.preLockCheck.Unlock()
+	fmt.Print(string(c.construPreLockAddressKey(net, typ, address)))
 	valuePreLockData := ldb.Get(c.construPreLockAddressKey(net, typ, address))
 	if valuePreLockData != nil {
 		return fmt.Errorf(global.AddrPreLockErrMsg)

@@ -20,7 +20,7 @@ const (
 	NotSupportMsg  string = "Not support net: "
 
 	ReqWithinDayCode int    = 110002
-	ReqWithinDayMsg  string = "Sorry! To be fair to all developers, we only send 100 AXM every 24 hours. Please try again after 24 hours from your original request."
+	ReqWithinDayMsg  string = "Sorry! To be fair to all developers, we only send once every 24 hours. Please try again after 24 hours from your original request."
 
 	EnoughTokenCode int    = 110003
 	EnoughTokenMsg  string = "The address already has enough test tokens"
