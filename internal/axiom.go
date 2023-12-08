@@ -99,7 +99,7 @@ func (c *Client) SendTra(net string, address string, amount float64, tweetUrl st
 func (c *Client) PreCheck(net string, address string) (int, error) {
 	lowerAddress := strings.ToLower(address)
 	// 合法校验：每天每个(net + type + addr)只发一个
-	if err := c.checkLimit(net, global.NativeToken, lowerAddress, c.ldb); err != nil {
+	if err := c.precheckLimit(net, global.NativeToken, lowerAddress, c.ldb); err != nil {
 		if err.Error() == global.AddrPreLockErrMsg {
 			return global.AddrPreLockErrCode, err
 		} else {
@@ -173,12 +173,39 @@ func (c *Client) construIpKey(net string) []byte {
 func (c *Client) checkLimit(net string, typ string, address string, ldb storage.Storage) error {
 	c.preLockCheck.Lock()
 	defer c.preLockCheck.Unlock()
-	fmt.Print(string(c.construPreLockAddressKey(net, typ, address)))
 	valuePreLockData := ldb.Get(c.construPreLockAddressKey(net, typ, address))
 	if valuePreLockData != nil {
 		return fmt.Errorf(global.AddrPreLockErrMsg)
 	}
 	c.ldb.Put(c.construPreLockAddressKey(net, global.NativeToken, address), []byte("preLock"))
+	value := ldb.Get(c.construAddressKey(net, typ, address))
+	if value != nil {
+		data := AddressData{}
+		if err := json.Unmarshal(value, &data); err != nil {
+			return fmt.Errorf("unmarshal error")
+		}
+		// 获取当前时间的 Unix 时间戳
+		currentUnixTime := time.Now().Unix()
+
+		// 计算时间差（以秒为单位）
+		timeDifference := currentUnixTime - data.SendTxTime
+
+		// 定义一天的秒数
+		oneDayInSeconds := int64(24 * 60 * 60)
+
+		// 比较时间差与一天的秒数
+		if timeDifference <= oneDayInSeconds {
+			return fmt.Errorf(global.ReqWithinDayMsg)
+		}
+	}
+	return nil
+}
+
+func (c *Client) precheckLimit(net string, typ string, address string, ldb storage.Storage) error {
+	valuePreLockData := ldb.Get(c.construPreLockAddressKey(net, typ, address))
+	if valuePreLockData != nil {
+		return fmt.Errorf(global.AddrPreLockErrMsg)
+	}
 	value := ldb.Get(c.construAddressKey(net, typ, address))
 	if value != nil {
 		data := AddressData{}
