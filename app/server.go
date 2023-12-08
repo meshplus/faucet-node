@@ -81,7 +81,9 @@ func (g *Server) directClaim(c *gin.Context) {
 
 	g.client.GinContext = c
 	txHash, code, err := g.client.SendTra(directClaimInput.Net, directClaimInput.Address, g.client.Config.Axiom.Amount, "")
-	internal.DeleteTxData(g.client, strings.ToLower(directClaimInput.Address), global.NativeToken, directClaimInput.Net)
+	if err == nil || err.Error() != global.AddrPreLockErrMsg {
+		internal.DeleteTxData(g.client, strings.ToLower(directClaimInput.Address), global.NativeToken, directClaimInput.Net)
+	}
 	if err != nil {
 		global.Result(global.Fail(code, err.Error()), c)
 		return
@@ -113,7 +115,9 @@ func (g *Server) tweetClaim(c *gin.Context) {
 
 	g.client.GinContext = c
 	txHash, code, err := g.client.SendTra(tweetClaimReq.Net, tweetClaimReq.Address, g.client.Config.Axiom.TweetAmount, tweetClaimReq.TweetUrl)
-	internal.DeleteTxData(g.client, strings.ToLower(tweetClaimReq.Address), global.NativeToken, tweetClaimReq.Net)
+	if err == nil || err.Error() != global.AddrPreLockErrMsg {
+		internal.DeleteTxData(g.client, strings.ToLower(tweetClaimReq.Address), global.NativeToken, tweetClaimReq.Net)
+	}
 	if err != nil {
 		global.Result(global.Fail(code, err.Error()), c)
 		return
