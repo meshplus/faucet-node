@@ -183,7 +183,7 @@ func IsValidEthereumAddress(address string) bool {
 }
 
 func isValidTwitterURL(url string) bool {
-	twitterURLPattern := `^(https?://(twitter\.com|x\.com)/[a-zA-Z0-9_]+/status/\d+)$`
+	twitterURLPattern := `^(https?://(twitter\.com|x\.com)/[a-zA-Z0-9_]+/status/\d+).*`
 	re := regexp.MustCompile(twitterURLPattern)
 	return re.MatchString(url)
 }
