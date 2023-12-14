@@ -6,6 +6,7 @@ import (
 	"crypto/ecdsa"
 	"encoding/hex"
 	"encoding/json"
+	"faucet/global"
 	"faucet/internal/loggers"
 	"faucet/internal/repo"
 	"faucet/internal/utils"
@@ -32,10 +33,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const (
-	nativeToken = "native"
-)
-
 type Client struct {
 	Config          *repo.Config
 	ctx             context.Context
@@ -46,6 +43,7 @@ type Client struct {
 	ldb             storage.Storage
 	logger          logrus.FieldLogger
 	GinContext      *gin.Context
+	preLockCheck    sync.Mutex
 }
 
 type AddressData struct {
@@ -54,36 +52,70 @@ type AddressData struct {
 	Amount     float64 `json:"amount"`
 }
 
-func (c *Client) SendTra(net string, address string) (string, error) {
+func (c *Client) SendTra(net string, address string, amount float64, tweetUrl string) (string, int, error) {
 	var (
 		txHash string
 		err    error
 	)
 	lowerAddress := strings.ToLower(address)
 	// 合法校验：每天每个(net + type + addr)只发一个
-	if err := c.checkLimit(net, nativeToken, lowerAddress, c.ldb); err != nil {
-		return "", err
+	if err := c.checkLimit(net, global.NativeToken, lowerAddress, c.ldb); err != nil {
+		if err.Error() == global.AddrPreLockErrMsg {
+			return "", global.AddrPreLockErrCode, err
+		} else {
+			return "", global.ReqWithinDayCode, err
+		}
 	}
-	txHash, err = sendTxAxm(c, address, c.Config.Axiom.Amount)
+
+	if tweetUrl != "" {
+		code, msg := c.TweetReqCheck(tweetUrl, address)
+		if code != global.SUCCESS {
+			return "", code, fmt.Errorf(msg)
+		}
+	}
+
+	txHash, err = sendTxAxm(c, address, amount)
 	if err != nil {
-		if err.Error() == "The address already has enough test tokens" {
-			return "", err
+		if err.Error() == global.EnoughTokenMsg {
+			return "", global.EnoughTokenCode, err
 		}
 		matched, matchErr := regexp.MatchString("insufficient funds", err.Error())
 		if matchErr != nil {
-			return "", matchErr
+			return "", global.BlockChainCode, fmt.Errorf(global.BlockChainMsg)
 		}
 		if matched {
-			return "", fmt.Errorf("faucet error")
+			return "", global.InsufficientCode, fmt.Errorf(global.InsufficientMsg)
 		}
-		return "", fmt.Errorf("axiomledger Network Error，Please Try Again Later！")
+		return "", global.CommonErrCode, fmt.Errorf(global.CommonErrMsg)
 	}
 	if checkTxSuccess(c, txHash) {
-		if err := putTxData(txHash, c, lowerAddress, nativeToken, net); err != nil {
-			return "", fmt.Errorf("putTxDataFailed: %w", err)
+		if err := putTxData(txHash, c, lowerAddress, global.NativeToken, net); err != nil {
+			return "", global.CommonErrCode, fmt.Errorf(global.CommonErrMsg)
 		}
 	}
-	return txHash, nil
+	return txHash, global.SUCCESS, nil
+}
+
+func (c *Client) PreCheck(net string, address string) (int, error) {
+	lowerAddress := strings.ToLower(address)
+	// 合法校验：每天每个(net + type + addr)只发一个
+	if err := c.precheckLimit(net, global.NativeToken, lowerAddress, c.ldb); err != nil {
+		if err.Error() == global.AddrPreLockErrMsg {
+			return global.AddrPreLockErrCode, err
+		} else {
+			return global.ReqWithinDayCode, err
+		}
+	}
+	judge, err := checkBalance(c, address)
+	if err != nil && !judge {
+		if err.Error() == global.EnoughTokenMsg {
+			return global.EnoughTokenCode, err
+		} else {
+			return global.CommonErrCode, fmt.Errorf(global.CommonErrMsg)
+		}
+	}
+	return global.SUCCESS, nil
+
 }
 
 func putTxData(txHash string, c *Client, address string, typ string, net string) error {
@@ -100,8 +132,8 @@ func putTxData(txHash string, c *Client, address string, typ string, net string)
 	return nil
 }
 
-func deleteTxData(c *Client, address string, typ string, net string) error {
-	c.ldb.Delete(c.construAddressKey(net, typ, address))
+func DeleteTxData(c *Client, address string, typ string, net string) error {
+	c.ldb.Delete(c.construPreLockAddressKey(net, typ, address))
 	return nil
 }
 
@@ -112,6 +144,17 @@ func (c *Client) construAddressKey(net string, typ string, address string) []byt
 	buffer.WriteString("-")
 	buffer.WriteString(typ)
 	c.logger.Infof("construKey: %s ", buffer)
+	return persist.CompositeKey(net, buffer)
+}
+
+func (c *Client) construPreLockAddressKey(net string, typ string, address string) []byte {
+	// get public_ip and ip with address and net tobe key
+	var buffer bytes.Buffer
+	buffer.WriteString(time.Now().Format("2006-01-02"))
+	buffer.WriteString("-")
+	buffer.WriteString(address)
+	buffer.WriteString("-")
+	buffer.WriteString(typ)
 	return persist.CompositeKey(net, buffer)
 }
 
@@ -128,6 +171,13 @@ func (c *Client) construIpKey(net string) []byte {
 }
 
 func (c *Client) checkLimit(net string, typ string, address string, ldb storage.Storage) error {
+	c.preLockCheck.Lock()
+	defer c.preLockCheck.Unlock()
+	valuePreLockData := ldb.Get(c.construPreLockAddressKey(net, typ, address))
+	if valuePreLockData != nil {
+		return fmt.Errorf(global.AddrPreLockErrMsg)
+	}
+	c.ldb.Put(c.construPreLockAddressKey(net, global.NativeToken, address), []byte("preLock"))
 	value := ldb.Get(c.construAddressKey(net, typ, address))
 	if value != nil {
 		data := AddressData{}
@@ -145,7 +195,35 @@ func (c *Client) checkLimit(net string, typ string, address string, ldb storage.
 
 		// 比较时间差与一天的秒数
 		if timeDifference <= oneDayInSeconds {
-			return fmt.Errorf("Sorry! To be fair to all developers, we only send 100 AXM every 24 hours. Please try again after 24 hours from your original request.")
+			return fmt.Errorf(global.ReqWithinDayMsg)
+		}
+	}
+	return nil
+}
+
+func (c *Client) precheckLimit(net string, typ string, address string, ldb storage.Storage) error {
+	valuePreLockData := ldb.Get(c.construPreLockAddressKey(net, typ, address))
+	if valuePreLockData != nil {
+		return fmt.Errorf(global.AddrPreLockErrMsg)
+	}
+	value := ldb.Get(c.construAddressKey(net, typ, address))
+	if value != nil {
+		data := AddressData{}
+		if err := json.Unmarshal(value, &data); err != nil {
+			return fmt.Errorf("unmarshal error")
+		}
+		// 获取当前时间的 Unix 时间戳
+		currentUnixTime := time.Now().Unix()
+
+		// 计算时间差（以秒为单位）
+		timeDifference := currentUnixTime - data.SendTxTime
+
+		// 定义一天的秒数
+		oneDayInSeconds := int64(24 * 60 * 60)
+
+		// 比较时间差与一天的秒数
+		if timeDifference <= oneDayInSeconds {
+			return fmt.Errorf(global.ReqWithinDayMsg)
 		}
 	}
 	return nil

@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"faucet/global"
 	"faucet/internal"
 	"faucet/internal/loggers"
 	"faucet/internal/utils"
@@ -28,22 +29,6 @@ type Server struct {
 	cancel context.CancelFunc
 }
 
-type nativeInput struct {
-	Net     string `json:"net"`
-	Address string `json:"address"`
-}
-
-type erc20Input struct {
-	Net             string `json:"net"`
-	Address         string `json:"address"`
-	ContractAddress string `json:"contractAddress"`
-}
-
-type response struct {
-	Msg  string `json:"msg"`
-	Data string `json:"txHash"`
-}
-
 func NewServer(client *internal.Client) (*Server, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	gin.SetMode(gin.ReleaseMode)
@@ -59,9 +44,11 @@ func NewServer(client *internal.Client) (*Server, error) {
 
 func (g *Server) Start() error {
 	g.router.Use(gin.Recovery()).Use(cors.Default()).Use(g.MaxAllowed(200))
-	v1 := g.router.Group("/faucet")
+	v := g.router.Group("/faucet")
 	{
-		v1.POST("nativeToken", g.nativeToken)
+		v.POST("directClaim", g.directClaim)
+		v.POST("tweetClaim", g.tweetClaim)
+		v.POST("preCheck", g.preCheck)
 	}
 
 	go func() {
@@ -75,37 +62,96 @@ func (g *Server) Start() error {
 	return nil
 }
 
-func (g *Server) nativeToken(c *gin.Context) {
-	res := &response{}
-	var nativeInput nativeInput
-	if err := c.BindJSON(&nativeInput); err != nil {
-		res.Msg = err.Error()
-		c.JSON(http.StatusBadRequest, res)
+func (g *Server) directClaim(c *gin.Context) {
+	var directClaimInput global.DirectClaimReq
+	if err := c.BindJSON(&directClaimInput); err != nil {
+		global.Result(global.Fail(global.ParseErrCode, global.ParseErrMsg), c)
 		return
 	}
 
-	if judge := IsValidEthereumAddress(nativeInput.Address); !judge {
-		res.Msg = fmt.Errorf("invalid address: %s", nativeInput.Address).Error()
-		c.JSON(http.StatusInternalServerError, res)
+	if judge := IsValidEthereumAddress(directClaimInput.Address); !judge {
+		global.Result(global.Fail(global.ErrAddrCode, global.ErrAddrMsg+fmt.Sprintf(directClaimInput.Address)), c)
 		return
 	}
 
-	if !strings.EqualFold("axm", nativeInput.Net) {
-		res.Msg = fmt.Errorf("not support net: %s", nativeInput.Net).Error()
-		c.JSON(http.StatusInternalServerError, res)
+	if !strings.EqualFold(global.TestNet, directClaimInput.Net) {
+		global.Result(global.Fail(global.NotSupportCode, global.NotSupportMsg+fmt.Sprintf(directClaimInput.Net)), c)
 		return
 	}
 
 	g.client.GinContext = c
-	data, err := g.client.SendTra(nativeInput.Net, nativeInput.Address)
+	txHash, code, err := g.client.SendTra(directClaimInput.Net, directClaimInput.Address, g.client.Config.Axiom.Amount, "")
+	if err == nil || err.Error() != global.AddrPreLockErrMsg {
+		internal.DeleteTxData(g.client, strings.ToLower(directClaimInput.Address), global.NativeToken, directClaimInput.Net)
+	}
 	if err != nil {
-		res.Msg = err.Error()
-		c.JSON(http.StatusInternalServerError, res)
+		global.Result(global.Fail(code, err.Error()), c)
 		return
 	}
-	res.Msg = "ok"
-	res.Data = data
-	c.PureJSON(http.StatusOK, res)
+
+	global.Result(global.Success(txHash), c)
+}
+
+func (g *Server) tweetClaim(c *gin.Context) {
+	var tweetClaimReq global.TweetClaimReq
+	if err := c.BindJSON(&tweetClaimReq); err != nil {
+		global.Result(global.Fail(global.ParseErrCode, global.ParseErrMsg), c)
+		return
+	}
+
+	if judge := IsValidEthereumAddress(tweetClaimReq.Address); !judge {
+		global.Result(global.Fail(global.ErrAddrCode, global.ErrAddrMsg+fmt.Sprintf(tweetClaimReq.Address)), c)
+		return
+	}
+
+	if !strings.EqualFold(global.TestNet, tweetClaimReq.Net) {
+		global.Result(global.Fail(global.NotSupportCode, global.NotSupportMsg+fmt.Sprintf(tweetClaimReq.Net)), c)
+		return
+	}
+	if judge := isValidTwitterURL(tweetClaimReq.TweetUrl); !judge {
+		global.Result(global.Fail(global.TweetUrlErrCode, global.TweetUrlErrMsg), c)
+		return
+	}
+
+	g.client.GinContext = c
+	txHash, code, err := g.client.SendTra(tweetClaimReq.Net, tweetClaimReq.Address, g.client.Config.Axiom.TweetAmount, tweetClaimReq.TweetUrl)
+	if err == nil || err.Error() != global.AddrPreLockErrMsg {
+		internal.DeleteTxData(g.client, strings.ToLower(tweetClaimReq.Address), global.NativeToken, tweetClaimReq.Net)
+	}
+	if err != nil {
+		global.Result(global.Fail(code, err.Error()), c)
+		return
+	}
+
+	global.Result(global.Success(txHash), c)
+
+}
+
+func (g *Server) preCheck(c *gin.Context) {
+	var preCheckReq global.PreCheckReq
+	if err := c.BindJSON(&preCheckReq); err != nil {
+		global.Result(global.Fail(global.ParseErrCode, global.ParseErrMsg), c)
+		return
+	}
+
+	if judge := IsValidEthereumAddress(preCheckReq.Address); !judge {
+		global.Result(global.Fail(global.ErrAddrCode, global.ErrAddrMsg+fmt.Sprintf(preCheckReq.Address)), c)
+		return
+	}
+
+	if !strings.EqualFold(global.TestNet, preCheckReq.Net) {
+		global.Result(global.Fail(global.NotSupportCode, global.NotSupportMsg+fmt.Sprintf(preCheckReq.Net)), c)
+		return
+	}
+
+	code, err := g.client.PreCheck(preCheckReq.Net, preCheckReq.Address)
+	if err != nil {
+		global.Result(global.Fail(code, err.Error()), c)
+		return
+	}
+
+	global.Result(global.Success(global.PreCheckPass), c)
+
 }
 
 func (g *Server) Stop() error {
@@ -134,4 +180,10 @@ func IsValidEthereumAddress(address string) bool {
 	pattern := "^0x[0-9a-fA-F]{40}$"
 	regex := regexp.MustCompile(pattern)
 	return regex.MatchString(address)
+}
+
+func isValidTwitterURL(url string) bool {
+	twitterURLPattern := `^(https?://(twitter\.com|x\.com)/[a-zA-Z0-9_]+/status/\d+).*`
+	re := regexp.MustCompile(twitterURLPattern)
+	return re.MatchString(url)
 }
