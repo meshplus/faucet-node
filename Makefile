@@ -44,16 +44,12 @@ test:
 	go generate ./...
 	@$(GO) test ${TEST_PKGS} -count=1
 
-
-packr2:
-	cd pkg/repo && packr2
-
 ## make install: Go install the project (hpc)
-install: packr2
+install:
 	$(GO) install -ldflags '${GOLDFLAGS}' ./cmd/${APP_NAME}
 	@printf "${GREEN}Build Faucet successfully${NC}\n"
 
-build: packr2
+build:
 	@mkdir -p bin
 	$(GO) build -ldflags '${GOLDFLAGS}' ./cmd/${APP_NAME}
 	@mv ./faucet bin
