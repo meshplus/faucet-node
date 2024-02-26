@@ -30,6 +30,9 @@ GREEN=\033[0;32m
 BLUE=\033[0;34m
 NC=\033[0m
 
+GOARCH := $(or $(GOARCH),$(shell go env GOARCH))
+GOOS := $(or $(GOOS),$(shell go env GOOS))
+
 .PHONY: test
 
 help: Makefile
@@ -43,7 +46,7 @@ test:
 
 
 packr2:
-	cd internal/repo && packr2
+	cd pkg/repo && packr2
 
 ## make install: Go install the project (hpc)
 install: packr2
@@ -55,3 +58,7 @@ build: packr2
 	$(GO) build -ldflags '${GOLDFLAGS}' ./cmd/${APP_NAME}
 	@mv ./faucet bin
 	@printf "${GREEN}Build Faucet successfully!${NC}\n"
+
+package:build
+	cp -f bin/${APP_NAME} ./scripts/package/tools/bin/${APP_NAME}
+	tar czvf ./${APP_NAME}-${APP_VERSION}-${GOARCH}-${GOOS}.tar.gz -C ./scripts/package/ .

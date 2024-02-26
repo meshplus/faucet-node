@@ -7,7 +7,7 @@ import (
 	"github.com/axiomesh/axiom-kit/log"
 
 	"github.com/fatih/color"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 )
 
 var logger = log.NewWithModule("cmd")
@@ -20,14 +20,14 @@ func main() {
 
 	// global flags
 	app.Flags = []cli.Flag{
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "repo",
-			Usage: "Faucet repository path",
+			Usage: "Work path",
 		},
 	}
 
-	app.Commands = []cli.Command{
-		initCMD,
+	app.Commands = []*cli.Command{
+		configCMD,
 		startCMD,
 	}
 

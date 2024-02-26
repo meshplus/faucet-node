@@ -4,8 +4,9 @@ import (
 	"context"
 	"faucet/global"
 	"faucet/internal"
-	"faucet/internal/loggers"
 	"faucet/internal/utils"
+	"faucet/pkg/loggers"
+	"faucet/pkg/repo"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -21,6 +22,7 @@ import (
 //4. 调用对应测试网交易
 
 type Server struct {
+	config *repo.Config
 	router *gin.Engine
 	logger logrus.FieldLogger
 	client *internal.Client
@@ -29,11 +31,12 @@ type Server struct {
 	cancel context.CancelFunc
 }
 
-func NewServer(client *internal.Client) (*Server, error) {
+func NewServer(client *internal.Client, config *repo.Config) (*Server, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
 	return &Server{
+		config: config,
 		router: router,
 		client: client,
 		ctx:    ctx,
@@ -55,6 +58,7 @@ func (g *Server) Start() error {
 		g.logger.Infoln("start gin success")
 		err := g.router.Run(fmt.Sprintf(":%s", g.client.Config.Network.Port))
 		if err != nil {
+			g.logger.Error(err)
 			panic(err)
 		}
 		<-g.ctx.Done()
@@ -74,7 +78,7 @@ func (g *Server) directClaim(c *gin.Context) {
 		return
 	}
 
-	if !strings.EqualFold(global.TestNet, directClaimInput.Net) {
+	if !strings.EqualFold(g.config.Axiom.TestNetName, directClaimInput.Net) {
 		global.Result(global.Fail(global.NotSupportCode, global.NotSupportMsg+fmt.Sprintf(directClaimInput.Net)), c)
 		return
 	}
@@ -104,7 +108,7 @@ func (g *Server) tweetClaim(c *gin.Context) {
 		return
 	}
 
-	if !strings.EqualFold(global.TestNet, tweetClaimReq.Net) {
+	if !strings.EqualFold(g.config.Axiom.TestNetName, tweetClaimReq.Net) {
 		global.Result(global.Fail(global.NotSupportCode, global.NotSupportMsg+fmt.Sprintf(tweetClaimReq.Net)), c)
 		return
 	}
@@ -139,7 +143,7 @@ func (g *Server) preCheck(c *gin.Context) {
 		return
 	}
 
-	if !strings.EqualFold(global.TestNet, preCheckReq.Net) {
+	if !strings.EqualFold(g.config.Axiom.TestNetName, preCheckReq.Net) {
 		global.Result(global.Fail(global.NotSupportCode, global.NotSupportMsg+fmt.Sprintf(preCheckReq.Net)), c)
 		return
 	}
@@ -150,7 +154,7 @@ func (g *Server) preCheck(c *gin.Context) {
 		return
 	}
 
-	global.Result(global.Success(global.PreCheckPass), c)
+	global.Result(global.Success("PreCheck Pass"), c)
 
 }
 
