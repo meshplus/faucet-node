@@ -10,7 +10,7 @@ const (
 	ParseErrMsg  string = "Params parse err"
 
 	CommonErrCode int    = 100001
-	CommonErrMsg  string = "Axiomledger-Aries Network Error，Please Try Again Later！"
+	CommonErrMsg  string = "Axiomledger-Taurus Network Error，Please Try Again Later！"
 
 	// Business Error
 	ErrAddrCode int    = 110000

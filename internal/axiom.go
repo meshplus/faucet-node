@@ -7,10 +7,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"faucet/global"
-	"faucet/internal/loggers"
-	"faucet/internal/repo"
 	"faucet/internal/utils"
 	"faucet/persist"
+	"faucet/pkg/loggers"
+	"faucet/pkg/repo"
 	"fmt"
 	"io/ioutil"
 	"path/filepath"
@@ -143,7 +143,6 @@ func (c *Client) construAddressKey(net string, typ string, address string) []byt
 	buffer.WriteString(address)
 	buffer.WriteString("-")
 	buffer.WriteString(typ)
-	c.logger.Infof("construKey: %s ", buffer)
 	return persist.CompositeKey(net, buffer)
 }
 
@@ -166,7 +165,6 @@ func (c *Client) construIpKey(net string) []byte {
 	buffer.WriteString(utils.ClientPublicIP(c.GinContext.Request))
 	buffer.WriteString("-")
 	buffer.WriteString(utils.ClientIp(c.GinContext.Request))
-	c.logger.Infof("construKey: %s ", buffer)
 	return persist.CompositeKey(net, buffer)
 }
 
@@ -250,12 +248,8 @@ func checkTxSuccess(c *Client, txHash string) bool {
 
 }
 
-func (c *Client) Initialize(configPath string) error {
+func (c *Client) Initialize(cfg *repo.Config, configPath string) error {
 	c.ctx = context.Background()
-	cfg, err := repo.UnmarshalConfig(configPath)
-	if err != nil {
-		return fmt.Errorf("unmarshal config for plugin :%w", err)
-	}
 	c.Config = cfg
 	// 构建axiom客户端
 	axiomClient, err := ethclient.Dial(cfg.Axiom.AxiomAddr)
@@ -284,7 +278,7 @@ func (c *Client) Initialize(configPath string) error {
 	c.axiomAuth = authAxm
 
 	// 初始化leveldb
-	leveldb, err := leveldb.New(filepath.Join(c.Config.RepoRoot, "store"))
+	leveldb, err := leveldb.New(filepath.Join(configPath, "store"), nil)
 	if err != nil {
 		return fmt.Errorf("create tm-leveldb: %w", err)
 	}

@@ -22,7 +22,7 @@ func sendTxAxm(c *Client, toAddr string, amount float64) (string, error) {
 		c.logger.Error(err)
 		return "", err
 	}
-	limit := floatToEtherBigInt(c.Config.Axiom.Limit)
+	limit := floatToEtherBigInt(c.Config.Axiom.ClaimLimit)
 	if balanceNow.Cmp(limit) >= 0 {
 		return "", fmt.Errorf(global.EnoughTokenMsg)
 	}
@@ -33,8 +33,8 @@ func sendTxAxm(c *Client, toAddr string, amount float64) (string, error) {
 		return "", err
 	}
 
-	value := floatToEtherBigInt(amount) // in wei (1 eth)
-	gasLimit := uint64(global.GasLimit) // in units
+	value := floatToEtherBigInt(amount)         // in wei (1 eth)
+	gasLimit := uint64(c.Config.Axiom.GasLimit) // in units
 	gasPrice, err := client.SuggestGasPrice(context.Background())
 	if err != nil {
 		c.logger.Error(err)
@@ -73,7 +73,7 @@ func checkBalance(c *Client, toAddr string) (bool, error) {
 		c.logger.Error(err)
 		return false, err
 	}
-	limit := floatToEtherBigInt(c.Config.Axiom.Limit)
+	limit := floatToEtherBigInt(c.Config.Axiom.ClaimLimit)
 	if balanceNow.Cmp(limit) >= 0 {
 		return false, fmt.Errorf(global.EnoughTokenMsg)
 	}
