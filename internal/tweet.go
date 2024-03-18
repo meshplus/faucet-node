@@ -30,7 +30,7 @@ func (c *Client) TweetReqCheck(tweetURL string, addr string) (int, string) {
 	resp, err := client.Get(fullURL)
 
 	if err != nil {
-		fmt.Println("HTTP请求发生错误:", err)
+		c.logger.Error("http request err:", err)
 		return global.ScrapperErrCode, global.ScrapperErrMsg
 	}
 	defer resp.Body.Close()
@@ -43,18 +43,18 @@ func (c *Client) TweetReqCheck(tweetURL string, addr string) (int, string) {
 	// 根据HTTP状态码判断是否成功
 	if resp.StatusCode == http.StatusOK {
 		// 处理成功的情况
-		fmt.Println("成功收到响应:", string(body))
 		var apiResp APIResponse
 
 		// 解析JSON数据到结构体
 		err = json.Unmarshal(body, &apiResp)
 		if err != nil {
-			fmt.Println("解析JSON发生错误:", err)
+			c.logger.Error("unmarshal json err:", err)
 			return global.ScrapperErrCode, global.ScrapperErrMsg
 		}
 		// 打印结果
-		fmt.Printf("消息: %s\n", apiResp.Message)
-		fmt.Printf("成功标志: %v\n", apiResp.Success)
+
+		c.logger.Info("msg: %s\n", apiResp.Message)
+		c.logger.Info("success sign: %v\n", apiResp.Success)
 		if apiResp.Success {
 			return global.SUCCESS, apiResp.Message
 		} else {
