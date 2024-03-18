@@ -2,12 +2,13 @@ package internal
 
 import (
 	"encoding/json"
-	"faucet/global"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"time"
+
+	"github.com/axiomesh/faucet/global"
 )
 
 type APIResponse struct {
@@ -35,7 +36,7 @@ func (c *Client) TweetReqCheck(tweetURL string, addr string) (int, string) {
 	}
 	defer resp.Body.Close()
 	// 读取响应体
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return global.ScrapperErrCode, global.ScrapperErrMsg
 	}
@@ -57,20 +58,18 @@ func (c *Client) TweetReqCheck(tweetURL string, addr string) (int, string) {
 		c.logger.Info("success sign: %v\n", apiResp.Success)
 		if apiResp.Success {
 			return global.SUCCESS, apiResp.Message
-		} else {
-			switch apiResp.Message {
-			case "The address is not in the tweet":
-				return global.TweetAddrErrCode, global.TweetAddrErrMsg
-			case "Err quote tweet", "No tweet content":
-				return global.TweetLinkErrCode, global.TweetLinkErrMsg
-			case "Err quote tweet time", "Expired tweet":
-				return global.TweetTimeErrCode, global.TweetTimeErrMsg
-			default:
-				return global.ScrapperErrCode, global.ScrapperErrMsg
-			}
+		}
+		switch apiResp.Message {
+		case "The address is not in the tweet":
+			return global.TweetAddrErrCode, global.TweetAddrErrMsg
+		case "Err quote tweet", "No tweet content":
+			return global.TweetLinkErrCode, global.TweetLinkErrMsg
+		case "Err quote tweet time", "Expired tweet":
+			return global.TweetTimeErrCode, global.TweetTimeErrMsg
+		default:
+			return global.ScrapperErrCode, global.ScrapperErrMsg
 		}
 	} else {
 		return global.ScrapperErrCode, global.ScrapperErrMsg
 	}
-
 }

@@ -2,12 +2,13 @@ package internal
 
 import (
 	"context"
-	"faucet/global"
 	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+
+	"github.com/axiomesh/faucet/global"
 )
 
 func sendTxAxm(c *Client, toAddr string, amount float64) (string, error) {
@@ -16,7 +17,7 @@ func sendTxAxm(c *Client, toAddr string, amount float64) (string, error) {
 	client := c.axiomClient
 
 	fromAddress := c.axiomAuth.From
-	//余额查询
+	// 余额查询
 	balanceNow, err := client.BalanceAt(context.Background(), common.HexToAddress(toAddr), nil)
 	if err != nil {
 		c.logger.Error(err)
@@ -67,7 +68,7 @@ func sendTxAxm(c *Client, toAddr string, amount float64) (string, error) {
 
 func checkBalance(c *Client, toAddr string) (bool, error) {
 	client := c.axiomClient
-	//余额查询
+	// 余额查询
 	balanceNow, err := client.BalanceAt(context.Background(), common.HexToAddress(toAddr), nil)
 	if err != nil {
 		c.logger.Error(err)
@@ -78,7 +79,6 @@ func checkBalance(c *Client, toAddr string) (bool, error) {
 		return false, fmt.Errorf(global.EnoughTokenMsg)
 	}
 	return true, nil
-
 }
 
 func floatToEtherBigInt(value float64) *big.Int {

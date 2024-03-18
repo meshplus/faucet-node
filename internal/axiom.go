@@ -6,13 +6,9 @@ import (
 	"crypto/ecdsa"
 	"encoding/hex"
 	"encoding/json"
-	"faucet/global"
-	"faucet/internal/utils"
-	"faucet/persist"
-	"faucet/pkg/loggers"
-	"faucet/pkg/repo"
+	"errors"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -22,8 +18,6 @@ import (
 	"github.com/Rican7/retry"
 	"github.com/Rican7/retry/backoff"
 	"github.com/Rican7/retry/strategy"
-	"github.com/axiomesh/axiom-kit/storage"
-	"github.com/axiomesh/axiom-kit/storage/leveldb"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -31,6 +25,14 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
+
+	"github.com/axiomesh/axiom-kit/storage"
+	"github.com/axiomesh/axiom-kit/storage/leveldb"
+	"github.com/axiomesh/faucet/global"
+	"github.com/axiomesh/faucet/internal/utils"
+	"github.com/axiomesh/faucet/persist"
+	"github.com/axiomesh/faucet/pkg/loggers"
+	"github.com/axiomesh/faucet/pkg/repo"
 )
 
 type Client struct {
@@ -62,9 +64,8 @@ func (c *Client) SendTra(net string, address string, amount float64, tweetUrl st
 	if err := c.checkLimit(net, global.NativeToken, lowerAddress, c.ldb); err != nil {
 		if err.Error() == global.AddrPreLockErrMsg {
 			return "", global.AddrPreLockErrCode, err
-		} else {
-			return "", global.ReqWithinDayCode, err
 		}
+		return "", global.ReqWithinDayCode, err
 	}
 
 	if tweetUrl != "" {
@@ -102,20 +103,17 @@ func (c *Client) PreCheck(net string, address string) (int, error) {
 	if err := c.precheckLimit(net, global.NativeToken, lowerAddress, c.ldb); err != nil {
 		if err.Error() == global.AddrPreLockErrMsg {
 			return global.AddrPreLockErrCode, err
-		} else {
-			return global.ReqWithinDayCode, err
 		}
+		return global.ReqWithinDayCode, err
 	}
 	judge, err := checkBalance(c, address)
 	if err != nil && !judge {
 		if err.Error() == global.EnoughTokenMsg {
 			return global.EnoughTokenCode, err
-		} else {
-			return global.CommonErrCode, fmt.Errorf(global.CommonErrMsg)
 		}
+		return global.CommonErrCode, fmt.Errorf(global.CommonErrMsg)
 	}
 	return global.SUCCESS, nil
-
 }
 
 func putTxData(txHash string, c *Client, address string, typ string, net string) error {
@@ -180,7 +178,7 @@ func (c *Client) checkLimit(net string, typ string, address string, ldb storage.
 	if value != nil {
 		data := AddressData{}
 		if err := json.Unmarshal(value, &data); err != nil {
-			return fmt.Errorf("unmarshal error")
+			return errors.New("unmarshal error")
 		}
 		// 获取当前时间的 Unix 时间戳
 		currentUnixTime := time.Now().Unix()
@@ -208,7 +206,7 @@ func (c *Client) precheckLimit(net string, typ string, address string, ldb stora
 	if value != nil {
 		data := AddressData{}
 		if err := json.Unmarshal(value, &data); err != nil {
-			return fmt.Errorf("unmarshal error")
+			return errors.New("unmarshal error")
 		}
 		// 获取当前时间的 Unix 时间戳
 		currentUnixTime := time.Now().Unix()
@@ -236,7 +234,7 @@ func checkTxSuccess(c *Client, txHash string) bool {
 		}
 		if err == nil && receipt != nil {
 			if receipt.Status == types.ReceiptStatusFailed {
-				return fmt.Errorf("faucet transfer failed")
+				return errors.New("faucet transfer failed")
 			}
 		}
 		return nil
@@ -245,7 +243,6 @@ func checkTxSuccess(c *Client, txHash string) bool {
 		return false
 	}
 	return true
-
 }
 
 func (c *Client) Initialize(cfg *repo.Config, configPath string) error {
@@ -260,7 +257,7 @@ func (c *Client) Initialize(cfg *repo.Config, configPath string) error {
 
 	// 构建auth_axm
 	keyPathAxm := filepath.Join(configPath, cfg.Axiom.AxiomKeyPath)
-	keyByteAxm, err := ioutil.ReadFile(keyPathAxm)
+	keyByteAxm, err := os.ReadFile(keyPathAxm)
 	if err != nil {
 		return err
 	}
@@ -286,6 +283,7 @@ func (c *Client) Initialize(cfg *repo.Config, configPath string) error {
 	c.logger = loggers.Logger(loggers.ApiServer)
 	return nil
 }
+
 func (c *Client) Close() {
 	c.ldb.Close()
 	c.axiomClient.Close()

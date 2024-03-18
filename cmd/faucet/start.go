@@ -2,10 +2,6 @@ package main
 
 import (
 	"context"
-	"faucet/app"
-	"faucet/internal"
-	"faucet/pkg/loggers"
-	"faucet/pkg/repo"
 	"fmt"
 	_ "net/http/pprof"
 	"os"
@@ -14,10 +10,15 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/axiomesh/axiom-kit/fileutil"
 	"github.com/common-nighthawk/go-figure"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
+
+	"github.com/axiomesh/axiom-kit/fileutil"
+	"github.com/axiomesh/faucet/app"
+	"github.com/axiomesh/faucet/internal"
+	"github.com/axiomesh/faucet/pkg/loggers"
+	"github.com/axiomesh/faucet/pkg/repo"
 )
 
 var (
@@ -97,5 +98,4 @@ func printLogo(log logrus.FieldLogger) {
 %s
 =========================================================================================
 `, fig.String())
-
 }

@@ -4,20 +4,27 @@ CURRENT_PATH = $(shell pwd)
 APP_NAME = faucet
 
 # build with verison infos
-VERSION_DIR = github.com/meshplus/${APP_NAME}
+BUILD_CONST_DIR = github.com/axiomesh/${APP_NAME}/pkg/repo
 BUILD_DATE = $(shell date +%FT%T)
 GIT_COMMIT = $(shell git log --pretty=format:'%h' -n 1)
 GIT_BRANCH = $(shell git rev-parse --abbrev-ref HEAD)
-ifeq (${GIT_BRANCH},HEAD)
-  APP_VERSION = $(shell git describe --tags HEAD)
+
+ifeq ($(version),)
+	# not specify version: make install
+	APP_VERSION = $(shell git describe --abbrev=0 --tag)
+	ifeq ($(APP_VERSION),)
+		APP_VERSION = dev
+	endif
 else
-  APP_VERSION = dev
+	# specify version: make install version=v0.6.1-dev
+	APP_VERSION = $(version)
 endif
 
-GOLDFLAGS += -X "${VERSION_DIR}.BuildDate=${BUILD_DATE}"
-GOLDFLAGS += -X "${VERSION_DIR}.CurrentCommit=${GIT_COMMIT}"
-GOLDFLAGS += -X "${VERSION_DIR}.CurrentBranch=${GIT_BRANCH}"
-GOLDFLAGS += -X "${VERSION_DIR}.CurrentVersion=${APP_VERSION}"
+
+GOLDFLAGS += -X "${BUILD_CONST_DIR}.BuildDate=${BUILD_DATE}"
+GOLDFLAGS += -X "${BUILD_CONST_DIR}.BuildCommit=${GIT_COMMIT}"
+GOLDFLAGS += -X "${BUILD_CONST_DIR}.BuildBranch=${GIT_BRANCH}"
+GOLDFLAGS += -X "${BUILD_CONST_DIR}.BuildVersion=${APP_VERSION}"
 
 STATIC_LDFLAGS += ${GOLDFLAGS}
 STATIC_LDFLAGS += -linkmode external -extldflags -static
