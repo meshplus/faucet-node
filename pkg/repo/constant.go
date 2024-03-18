@@ -1,6 +1,8 @@
 package repo
 
 const (
+	AppName = "faucet"
+
 	// DefaultPathName is the default config dir name
 	DefaultPathName = ".faucet"
 

@@ -5,10 +5,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"faucet/pkg/repo"
+	"github.com/urfave/cli/v2"
 
 	"github.com/axiomesh/axiom-kit/fileutil"
-	"github.com/urfave/cli/v2"
+	"github.com/axiomesh/faucet/pkg/repo"
 )
 
 var configCMD = &cli.Command{

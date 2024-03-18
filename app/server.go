@@ -2,11 +2,6 @@ package app
 
 import (
 	"context"
-	"faucet/global"
-	"faucet/internal"
-	"faucet/internal/utils"
-	"faucet/pkg/loggers"
-	"faucet/pkg/repo"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -15,12 +10,17 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
+
+	"github.com/axiomesh/faucet/global"
+	"github.com/axiomesh/faucet/internal"
+	"github.com/axiomesh/faucet/internal/utils"
+	"github.com/axiomesh/faucet/pkg/loggers"
+	"github.com/axiomesh/faucet/pkg/repo"
 )
 
-//2. api：input： net，contractAddress，address； output：0，hash
-//3. 验证leveldb， key：address； value：[timestamp, net（eth，bxh），amount, contartAddress] , 每天发一个
-//4. 调用对应测试网交易
-
+// 2. api：input： net，contractAddress，address； output：0，hash
+// 3. 验证leveldb， key：address； value：[timestamp, net（eth，bxh），amount, contartAddress] , 每天发一个
+// 4. 调用对应测试网交易
 type Server struct {
 	config *repo.Config
 	router *gin.Engine
@@ -128,7 +128,6 @@ func (g *Server) tweetClaim(c *gin.Context) {
 	}
 
 	global.Result(global.Success(txHash), c)
-
 }
 
 func (g *Server) preCheck(c *gin.Context) {
@@ -155,7 +154,6 @@ func (g *Server) preCheck(c *gin.Context) {
 	}
 
 	global.Result(global.Success("PreCheck Pass"), c)
-
 }
 
 func (g *Server) Stop() error {
@@ -172,7 +170,7 @@ func (g *Server) MaxAllowed(limitValue int64) func(c *gin.Context) {
 	// 返回限流逻辑
 	return func(c *gin.Context) {
 		if !limiter.Ok() {
-			c.AbortWithStatus(http.StatusServiceUnavailable) //超过每秒200，就返回503错误码
+			c.AbortWithStatus(http.StatusServiceUnavailable) // 超过每秒200，就返回503错误码
 			return
 		}
 		c.Next()

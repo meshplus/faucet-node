@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"faucet/pkg/repo"
+	"github.com/sirupsen/logrus"
 
 	"github.com/axiomesh/axiom-kit/log"
-	"github.com/sirupsen/logrus"
+	"github.com/axiomesh/faucet/pkg/repo"
 )
 
 const (

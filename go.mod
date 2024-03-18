@@ -1,4 +1,4 @@
-module faucet
+module github.com/axiomesh/faucet
 
 go 1.20
 
